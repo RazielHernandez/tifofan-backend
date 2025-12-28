@@ -4,24 +4,27 @@ import * as logger from "firebase-functions/logger";
 
 import {fetchFromApiFootball} from "./api/apiFootball";
 import {getCached, setCached} from "./cache/firestoreCache";
+import {sanitizeForFirestore} from "./utils/sanitizeFirestore";
 
 /**
- * API-Football secret key (stored securely with Firebase Secrets)
+ * API-Football secret key (stored in Firebase Secrets)
  */
 const API_FOOTBALL_KEY = defineSecret("API_FOOTBALL_KEY");
 
 /* -------------------------------------------------------------------------- */
-/*                                Helpers                                     */
+/*                                   Helpers                                  */
 /* -------------------------------------------------------------------------- */
 
 /**
  * Safely extracts a single query parameter as a string.
  *
- * @param {unknown} value - Query parameter value.
- * @return {string | undefined} Normalized string value.
+ * @param {unknown} value Query parameter value.
+ * @return {string | undefined} Normalized string or undefined.
  */
 function getQueryParam(value: unknown): string | undefined {
-  if (typeof value === "string") return value;
+  if (typeof value === "string") {
+    return value;
+  }
   if (Array.isArray(value) && typeof value[0] === "string") return value[0];
   return undefined;
 }
@@ -29,36 +32,47 @@ function getQueryParam(value: unknown): string | undefined {
 /**
  * Safely extracts a query parameter as a number.
  *
- * @param {unknown} value - Query parameter value.
+ * @param {unknown} value Query parameter value.
  * @return {number | undefined} Parsed number or undefined.
  */
 function getQueryNumber(value: unknown): number | undefined {
   const str = getQueryParam(value);
   if (!str) return undefined;
+
   const num = Number(str);
   return Number.isFinite(num) ? num : undefined;
 }
 
 /* -------------------------------------------------------------------------- */
-/*                               Functions                                    */
+/*                                  Functions                                 */
 /* -------------------------------------------------------------------------- */
 
 /**
- * Health check / example function
+ * Health check endpoint.
+ *
+ * @example
+ * GET /helloWorld
  */
 export const helloWorld = onRequest((req, res) => {
   res.json({status: "ok", service: "TifoFan backend"});
 });
 
+/* -------------------------------------------------------------------------- */
+/*                                  Matches                                   */
+/* -------------------------------------------------------------------------- */
+
 /**
- * Get fixtures (matches) by league and season
+ * Returns fixtures by league and season.
+ *
+ * @param req HTTP request
+ * @param res HTTP response
  *
  * @example
  * GET /getMatches?league=39&season=2024
  */
 export const getMatches = onRequest(
   {secrets: [API_FOOTBALL_KEY]},
-  async (req, res) => {
+  async (req, res): Promise<void> => {
     try {
       const league = getQueryNumber(req.query.league);
       const season = getQueryNumber(req.query.season);
@@ -81,7 +95,7 @@ export const getMatches = onRequest(
         API_FOOTBALL_KEY.value()
       );
 
-      await setCached(cacheKey, data, 60 * 60); // 1 hour
+      await setCached(cacheKey, data, 60 * 60);
       res.json(data);
     } catch (error) {
       logger.error("getMatches error", error);
@@ -91,17 +105,16 @@ export const getMatches = onRequest(
 );
 
 /**
- * Get match details by fixture ID
+ * Returns match details by fixture ID.
  *
  * @example
  * GET /getMatchDetails?fixture=123456
  */
 export const getMatchDetails = onRequest(
   {secrets: [API_FOOTBALL_KEY]},
-  async (req, res) => {
+  async (req, res): Promise<void> => {
     try {
       const fixture = getQueryNumber(req.query.fixture);
-
       if (!fixture) {
         res.status(400).json({error: "fixture is required"});
         return;
@@ -120,7 +133,7 @@ export const getMatchDetails = onRequest(
         API_FOOTBALL_KEY.value()
       );
 
-      await setCached(cacheKey, data, 30 * 60); // 30 minutes
+      await setCached(cacheKey, data, 30 * 60);
       res.json(data);
     } catch (error) {
       logger.error("getMatchDetails error", error);
@@ -129,18 +142,21 @@ export const getMatchDetails = onRequest(
   }
 );
 
+/* -------------------------------------------------------------------------- */
+/*                                   Teams                                    */
+/* -------------------------------------------------------------------------- */
+
 /**
- * Get team details
+ * Returns basic team information.
  *
  * @example
  * GET /getTeam?id=33
  */
 export const getTeam = onRequest(
   {secrets: [API_FOOTBALL_KEY]},
-  async (req, res) => {
+  async (req, res): Promise<void> => {
     try {
       const teamId = getQueryNumber(req.query.id);
-
       if (!teamId) {
         res.status(400).json({error: "team id is required"});
         return;
@@ -169,32 +185,49 @@ export const getTeam = onRequest(
 );
 
 /**
- * Get team details by ID
+ * Returns team statistics by league and season.
  *
- * @example GET /getTeamDetails?id=33
+ * @example
+ * GET /getTeamDetails?team=33&league=39&season=2024
  */
 export const getTeamDetails = onRequest(
   {secrets: [API_FOOTBALL_KEY]},
-  async (req, res) => {
+  async (req, res): Promise<void> => {
     try {
-      const teamId = getQueryNumber(req.query.id);
-      if (!teamId) {
-        res.status(400).json({error: "team id is required"});
+      const team = getQueryNumber(req.query.team);
+      const league = getQueryNumber(req.query.league);
+      const season = getQueryNumber(req.query.season);
+
+      if (!team || !league || !season) {
+        res.status(400).json({error: "team, league and season are required"});
         return;
       }
 
-      const cacheKey = `teamDetails_${teamId}`;
+      const cacheKey = [
+        "teamDetails",
+        team,
+        league,
+        season,
+      ].filter(Boolean).join("_");
       const cached = await getCached(cacheKey);
       if (cached) {
         res.json(cached);
         return;
       }
 
-      const data = await fetchFromApiFootball(
+      const rawData = await fetchFromApiFootball(
         "teams/statistics",
-        {team: teamId},
+        {team, league, season},
         API_FOOTBALL_KEY.value()
       );
+
+      const data = sanitizeForFirestore(rawData);
+
+      /* const data = await fetchFromApiFootball(
+        "teams/statistics",
+        {team, league, season},
+        API_FOOTBALL_KEY.value()
+      ); */
 
       await setCached(cacheKey, data, 24 * 60 * 60);
       res.json(data);
@@ -206,14 +239,58 @@ export const getTeamDetails = onRequest(
 );
 
 /**
- * Get player details
+ * Returns players of a team for a given season.
+ *
+ * @example
+ * GET /getTeamPlayers?team=33&season=2024
+ */
+export const getTeamPlayers = onRequest(
+  {secrets: [API_FOOTBALL_KEY]},
+  async (req, res): Promise<void> => {
+    try {
+      const team = getQueryNumber(req.query.team);
+      const season = getQueryNumber(req.query.season);
+
+      if (!team || !season) {
+        res.status(400).json({error: "team and season are required"});
+        return;
+      }
+
+      const cacheKey = `teamPlayers_${team}_${season}`;
+      const cached = await getCached(cacheKey);
+      if (cached) {
+        res.json(cached);
+        return;
+      }
+
+      const data = await fetchFromApiFootball(
+        "players",
+        {team, season},
+        API_FOOTBALL_KEY.value()
+      );
+
+      await setCached(cacheKey, data, 12 * 60 * 60);
+      res.json(data);
+    } catch (error) {
+      logger.error("getTeamPlayers error", error);
+      res.status(500).json({error: "Internal server error"});
+    }
+  }
+);
+
+/* -------------------------------------------------------------------------- */
+/*                                   Players                                  */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Returns player details by season.
  *
  * @example
  * GET /getPlayer?id=276&season=2024
  */
 export const getPlayer = onRequest(
   {secrets: [API_FOOTBALL_KEY]},
-  async (req, res) => {
+  async (req, res): Promise<void> => {
     try {
       const playerId = getQueryNumber(req.query.id);
       const season = getQueryNumber(req.query.season);
