@@ -5,7 +5,10 @@ import {defineSecret} from "firebase-functions/params";
 import {fetchFromApiFootball} from "../api/apiFootball";
 import {getCached, setCached} from "../cache/firestoreCache";
 import {getQueryNumber} from "../utils/queryHelpers";
-import {sanitizeForFirestore} from "../utils/sanitizeFirestore";
+import {normalizeTeam} from "../normalizers/teamNormalizer";
+import {normalizeTeamStats} from "../normalizers/teamStatsNormalizer";
+import {normalizeTeamPlayer} from "../normalizers/teamPlayersNormalizer";
+import {Team} from "../types/team";
 
 const API_FOOTBALL_KEY = defineSecret("API_FOOTBALL_KEY");
 
@@ -36,14 +39,36 @@ export const getTeam = onRequest(
         return;
       }
 
-      const data = await fetchFromApiFootball(
+      /* const data = await fetchFromApiFootball(
         "teams",
         {id: teamId},
         API_FOOTBALL_KEY.value()
       );
 
       await setCached(cacheKey, data, 24 * 60 * 60);
-      res.json(data);
+      res.json(data); */
+
+      const raw = await fetchFromApiFootball(
+        "teams",
+        {id: teamId},
+        API_FOOTBALL_KEY.value()
+      );
+
+      // const normalized=normalizeTeam(raw);
+
+      /* if (!Array.isArray(raw) || raw.length === 0) {
+        res.status(404).json({error: "Team not found"});
+        return;
+      }
+
+      const normalized = normalizeTeam(raw[0]); */
+
+      const normalized: Team = normalizeTeam(raw[0]);
+      res.json(normalized);
+
+
+      await setCached(cacheKey, normalized, 86400);
+      res.json(normalized);
     } catch (error) {
       logger.error("getTeam error", error);
       res.status(500).json({error: "Internal server error"});
@@ -82,22 +107,35 @@ export const getTeamDetails = onRequest(
         return;
       }
 
-      const rawData = await fetchFromApiFootball(
-        "teams/statistics",
-        {team, league, season},
-        API_FOOTBALL_KEY.value()
-      );
-
-      const data = sanitizeForFirestore(rawData);
-
-      /* const data = await fetchFromApiFootball(
+      /* const rawData = await fetchFromApiFootball(
         "teams/statistics",
         {team, league, season},
         API_FOOTBALL_KEY.value()
       ); */
 
-      await setCached(cacheKey, data, 24 * 60 * 60);
-      res.json(data);
+      // const data = sanitizeForFirestore(rawData);
+      // await setCached(cacheKey, data, 24 * 60 * 60);
+      // res.json(data);
+
+      const data = await fetchFromApiFootball(
+        "teams/statistics",
+        {team, league, season},
+        API_FOOTBALL_KEY.value()
+      );
+
+      if (!data || typeof data !== "object") {
+        throw new Error("Invalid team statistics response");
+      }
+
+      const normalized = normalizeTeamStats(
+        data,
+        team,
+        league,
+        season
+      );
+
+      await setCached(cacheKey, normalized, 24 * 60 * 60);
+      res.json(normalized);
     } catch (error) {
       logger.error("getTeamDetails error", error);
       res.status(500).json({error: "Internal server error"});
@@ -130,14 +168,29 @@ export const getTeamPlayers = onRequest(
         return;
       }
 
-      const data = await fetchFromApiFootball(
+      /* const data = await fetchFromApiFootball(
         "players",
         {team, season},
         API_FOOTBALL_KEY.value()
       );
 
       await setCached(cacheKey, data, 12 * 60 * 60);
-      res.json(data);
+      res.json(data); */
+
+      const data = await fetchFromApiFootball(
+        "players",
+        {team, season},
+        API_FOOTBALL_KEY.value()
+      );
+
+      if (!Array.isArray(data)) {
+        throw new Error("Invalid players response");
+      }
+
+      const normalized = data.map(normalizeTeamPlayer);
+
+      await setCached(cacheKey, normalized, 12 * 60 * 60);
+      res.json(normalized);
     } catch (error) {
       logger.error("getTeamPlayers error", error);
       res.status(500).json({error: "Internal server error"});
