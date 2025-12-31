@@ -39,15 +39,6 @@ export const getPlayer = onRequest(
         return;
       }
 
-      /* const data = await fetchFromApiFootball(
-        "players",
-        {id: playerId, season},
-        API_FOOTBALL_KEY.value()
-      );
-
-      await setCached(cacheKey, data, 12 * 60 * 60);
-      res.json(data); */
-
       const data = await fetchFromApiFootball(
         "players",
         {id: playerId, season},

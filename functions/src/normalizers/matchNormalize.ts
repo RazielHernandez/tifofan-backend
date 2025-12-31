@@ -1,5 +1,4 @@
-import {NormalizedMatch} from "../types/match";
-import {NormalizedMatchDetails} from "../types/match";
+import {NormalizedMatch, NormalizedMatchDetails} from "../types/match";
 
 /**
  * Normalizes a match response from API-Football.

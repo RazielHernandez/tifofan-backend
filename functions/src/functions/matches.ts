@@ -5,8 +5,10 @@ import {defineSecret} from "firebase-functions/params";
 import {fetchFromApiFootball} from "../api/apiFootball";
 import {getCached, setCached} from "../cache/firestoreCache";
 import {getQueryNumber} from "../utils/queryHelpers";
-import {normalizeMatch} from "../normalizers/matchNormalize";
-import {normalizeMatchDetails} from "../normalizers/matchNormalize";
+import {
+  normalizeMatch,
+  normalizeMatchDetails,
+} from "../normalizers/matchNormalize";
 
 const API_FOOTBALL_KEY = defineSecret("API_FOOTBALL_KEY");
 
@@ -41,15 +43,6 @@ export const getMatches = onRequest(
         res.json(cached);
         return;
       }
-
-      /* const data = await fetchFromApiFootball(
-        "fixtures",
-        {league, season},
-        API_FOOTBALL_KEY.value()
-      );
-
-      await setCached(cacheKey, data, 60 * 60);
-      res.json(data); */
 
       const data = await fetchFromApiFootball(
         "fixtures",
