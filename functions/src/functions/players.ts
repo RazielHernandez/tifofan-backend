@@ -6,6 +6,8 @@ import {fetchFromApiFootball} from "../api/apiFootball";
 import {getCached, setCached} from "../cache/firestoreCache";
 import {getQueryNumber} from "../utils/queryHelpers";
 
+import {normalizeTeamPlayer} from "../normalizers/teamPlayersNormalizer";
+
 const API_FOOTBALL_KEY = defineSecret("API_FOOTBALL_KEY");
 
 /* -------------------------------------------------------------------------- */
@@ -37,14 +39,29 @@ export const getPlayer = onRequest(
         return;
       }
 
-      const data = await fetchFromApiFootball(
+      /* const data = await fetchFromApiFootball(
         "players",
         {id: playerId, season},
         API_FOOTBALL_KEY.value()
       );
 
       await setCached(cacheKey, data, 12 * 60 * 60);
-      res.json(data);
+      res.json(data); */
+
+      const data = await fetchFromApiFootball(
+        "players",
+        {id: playerId, season},
+        API_FOOTBALL_KEY.value()
+      );
+
+      if (!Array.isArray(data) || !data[0]) {
+        throw new Error("Player not found");
+      }
+
+      const player = normalizeTeamPlayer(data[0]);
+
+      await setCached(cacheKey, player, 12 * 60 * 60);
+      res.json(player);
     } catch (error) {
       logger.error("getPlayer error", error);
       res.status(500).json({error: "Internal server error"});
