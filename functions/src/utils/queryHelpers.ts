@@ -2,6 +2,32 @@
 /*                                   Helpers                                  */
 /* -------------------------------------------------------------------------- */
 
+import {ApiError} from "./apiError";
+
+/**
+ * Safely extracts and validates a query parameter as a positive number.
+ *
+ * @param {unknown} value Query parameter value.
+ * @param {string} name Parameter name for error messages.
+ * @return {number} Validated positive number.
+ * @throws {ApiError} If value is not a positive integer.
+ */
+export function getNumberParam(
+  value: unknown,
+  name: string
+): number {
+  const num = Number(value);
+
+  if (!Number.isInteger(num) || num <= 0) {
+    throw new ApiError(
+      400, "invalid_param", `${name} must be a positive number`
+    );
+  }
+
+  return num;
+}
+
+
 /**
  * Safely extracts a single query parameter as a string.
  *
