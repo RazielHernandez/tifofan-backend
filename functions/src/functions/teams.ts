@@ -3,6 +3,8 @@ import {defineSecret} from "firebase-functions/params";
 
 import {fetchFromApiFootball} from "../api/apiFootball";
 import {getCached, setCached} from "../cache/firestoreCache";
+import {buildCacheKey} from "../cache/cacheKeys";
+import {CACHE_TTL} from "../cache/cacheConfig";
 import {normalizeTeam} from "../normalizers/teamNormalizer";
 import {normalizeTeamStats} from "../normalizers/teamStatsNormalizer";
 import {normalizeTeamPlayer} from "../normalizers/teamPlayersNormalizer";
@@ -27,7 +29,8 @@ export const getTeam = onRequest(
   handler(async (req, res) => {
     const teamId = getNumberParam(req.query.id, "id");
 
-    const cacheKey = `team_${teamId}`;
+    // const cacheKey = `team_${teamId}`;
+    const cacheKey = buildCacheKey("team", teamId);
     const cached = await getCached(cacheKey);
     if (cached) {
       res.json(cached);
@@ -41,8 +44,9 @@ export const getTeam = onRequest(
     );
 
     const normalized: Team = normalizeTeam(raw[0]);
-    res.json(normalized);
-    await setCached(cacheKey, normalized, 86400);
+    // res.json(normalized);
+    // await setCached(cacheKey, normalized, 86400);
+    await setCached(cacheKey, normalized, CACHE_TTL.team);
     res.json(normalized);
   })
 );
@@ -60,7 +64,8 @@ export const getTeamDetails = onRequest(
     const league = getNumberParam(req.query.league, "league");
     const season = getNumberParam(req.query.season, "season");
 
-    const cacheKey = `team_stats_${team}_${league}_${season}`;
+    // const cacheKey = `team_stats_${team}_${league}_${season}`;
+    const cacheKey = buildCacheKey("teamDetails", team, league, season);
     const cached = await getCached(cacheKey);
     if (cached) {
       res.json(cached);
@@ -80,7 +85,8 @@ export const getTeamDetails = onRequest(
       season
     );
 
-    await setCached(cacheKey, normalized, 24 * 60 * 60);
+    // await setCached(cacheKey, normalized, 24 * 60 * 60);
+    await setCached(cacheKey, normalized, CACHE_TTL.teamDetails);
     res.json(normalized);
   })
 );
@@ -98,7 +104,8 @@ export const getTeamPlayers = onRequest(
     const league = getNumberParam(req.query.league, "league");
     const season = getNumberParam(req.query.season, "season");
 
-    const cacheKey = `team_players_${team}_${league}_${season}`;
+    // const cacheKey = `team_players_${team}_${league}_${season}`;
+    const cacheKey = buildCacheKey("teamPlayers", team, league, season);
     const cached = await getCached(cacheKey);
     if (cached) {
       res.json(cached);
@@ -112,7 +119,8 @@ export const getTeamPlayers = onRequest(
     );
 
     const players = raw.map(normalizeTeamPlayer);
-    await setCached(cacheKey, players, 12 * 60 * 60);
+    // await setCached(cacheKey, players, 12 * 60 * 60);
+    await setCached(cacheKey, players, CACHE_TTL.teamPlayers);
     res.json(players);
   })
 );

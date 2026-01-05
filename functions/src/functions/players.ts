@@ -2,6 +2,8 @@ import {onRequest} from "firebase-functions/v2/https";
 import {defineSecret} from "firebase-functions/params";
 import {fetchFromApiFootball} from "../api/apiFootball";
 import {getCached, setCached} from "../cache/firestoreCache";
+import {buildCacheKey} from "../cache/cacheKeys";
+import {CACHE_TTL} from "../cache/cacheConfig";
 import {normalizeTeamPlayer} from "../normalizers/teamPlayersNormalizer";
 import {handler} from "../utils/handler";
 import {getNumberParam} from "../utils/queryHelpers";
@@ -24,7 +26,8 @@ export const getPlayer = onRequest(
     const playerId = getNumberParam(req.query.id, "id");
     const season = getNumberParam(req.query.season, "season");
 
-    const cacheKey = `player_${playerId}_${season}`;
+    // const cacheKey = `player_${playerId}_${season}`;
+    const cacheKey = buildCacheKey("player", playerId, season);
     const cached = await getCached(cacheKey);
     if (cached) {
       res.json(cached);
@@ -38,7 +41,8 @@ export const getPlayer = onRequest(
     );
 
     const player = normalizeTeamPlayer(raw[0]);
-    await setCached(cacheKey, player, 12 * 60 * 60);
+    // await setCached(cacheKey, player, 12 * 60 * 60);
+    await setCached(cacheKey, player, CACHE_TTL.player);
     res.json(player);
   })
 );
