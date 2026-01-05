@@ -37,51 +37,8 @@ export const getPlayer = onRequest(
       API_FOOTBALL_KEY.value()
     );
 
-    // const player = normalizePlayer(raw);
-    // await setCached(cacheKey, player, 12 * 60 * 60);
-    // res.json(player);
     const player = normalizeTeamPlayer(raw[0]);
     await setCached(cacheKey, player, 12 * 60 * 60);
     res.json(player);
   })
 );
-
-/* export const getPlayer = onRequest(
-  {secrets: [API_FOOTBALL_KEY]},
-  async (req, res): Promise<void> => {
-    try {
-      const playerId = getQueryNumber(req.query.id);
-      const season = getQueryNumber(req.query.season);
-
-      if (!playerId || !season) {
-        res.status(400).json({error: "player id and season are required"});
-        return;
-      }
-
-      const cacheKey = `player_${playerId}_${season}`;
-      const cached = await getCached(cacheKey);
-      if (cached) {
-        res.json(cached);
-        return;
-      }
-
-      const data = await fetchFromApiFootball(
-        "players",
-        {id: playerId, season},
-        API_FOOTBALL_KEY.value()
-      );
-
-      if (!Array.isArray(data) || !data[0]) {
-        throw new Error("Player not found");
-      }
-
-      const player = normalizeTeamPlayer(data[0]);
-
-      await setCached(cacheKey, player, 12 * 60 * 60);
-      res.json(player);
-    } catch (error) {
-      logger.error("getPlayer error", error);
-      res.status(500).json({error: "Internal server error"});
-    }
-  }
-); */

@@ -44,54 +44,11 @@ export const getMatches = onRequest(
       API_FOOTBALL_KEY.value()
     );
 
-    // const matches = normalizeMatches(raw);
-    // await setCached(cacheKey, matches, 5 * 60);
-    // res.json(matches);
-
     const matches = raw.map(normalizeMatch);
     await setCached(cacheKey, matches, 12 * 60 * 60);
     res.json(matches);
   })
 );
-
-/* export const getMatches = onRequest(
-  {secrets: [API_FOOTBALL_KEY]},
-  async (req, res): Promise<void> => {
-    try {
-      const league = getQueryNumber(req.query.league);
-      const season = getQueryNumber(req.query.season);
-
-      if (!league || !season) {
-        res.status(400).json({error: "league and season are required"});
-        return;
-      }
-
-      const cacheKey = `matches_${league}_${season}`;
-      const cached = await getCached(cacheKey);
-      if (cached) {
-        res.json(cached);
-        return;
-      }
-
-      const data = await fetchFromApiFootball(
-        "fixtures",
-        {league, season},
-        API_FOOTBALL_KEY.value()
-      );
-
-      if (!Array.isArray(data)) {
-        throw new Error("Invalid matches response");
-      }
-
-      const matches = data.map(normalizeMatch);
-      await setCached(cacheKey, matches, 12 * 60 * 60);
-      res.json(matches);
-    } catch (error) {
-      logger.error("getMatches error", error);
-      res.status(500).json({error: "Internal server error"});
-    }
-  }
-); */
 
 /**
  * Returns match details by fixture ID.
@@ -122,35 +79,3 @@ export const getMatchDetails = onRequest(
     res.json(match);
   })
 );
-/* export const getMatchDetails = onRequest(
-  {secrets: [API_FOOTBALL_KEY]},
-  async (req, res): Promise<void> => {
-    try {
-      const fixture = getNumberParam(req.query.fixture, "matchId");
-
-      const cacheKey = `match_${fixture}`;
-      const cached = await getCached(cacheKey);
-      if (cached) {
-        res.json(cached);
-        return;
-      }
-
-      const data = await fetchFromApiFootball(
-        "fixtures",
-        {id: fixture},
-        API_FOOTBALL_KEY.value()
-      );
-
-      if (!Array.isArray(data) || !data[0]) {
-        throw new ApiError(404, "match_not_found", "Match not found");
-      }
-
-      const details = normalizeMatchDetails(data[0]);
-      await setCached(cacheKey, details, 12 * 60 * 60);
-      res.json(details);
-    } catch (error) {
-      logger.error("getMatchDetails error", error);
-      res.status(500).json({error: "Internal server error"});
-    }
-  }
-); */
