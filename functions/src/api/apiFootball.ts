@@ -34,6 +34,5 @@ export async function fetchFromApiFootball(
     throw new Error(`API-Football error ${response.status}: ${text}`);
   }
 
-  const json = await response.json();
-  return json.response;
+  return response.json();
 }

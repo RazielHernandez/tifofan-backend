@@ -14,7 +14,7 @@ export function sanitizeForFirestore(input: unknown): unknown {
     const result: Record<string, unknown> = {};
 
     for (const [key, value] of Object.entries(input)) {
-      if (key === "") continue; // 🔥 REMOVE INVALID FIELD
+      if (key === "") continue;
       result[key] = sanitizeForFirestore(value);
     }
 

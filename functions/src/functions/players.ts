@@ -7,6 +7,7 @@ import {CACHE_TTL} from "../cache/cacheConfig";
 import {normalizeTeamPlayer} from "../normalizers/teamPlayersNormalizer";
 import {handler} from "../utils/handler";
 import {getNumberParam} from "../utils/queryHelpers";
+import {ok} from "../utils/response";
 
 const API_FOOTBALL_KEY = defineSecret("API_FOOTBALL_KEY");
 
@@ -30,19 +31,25 @@ export const getPlayer = onRequest(
     const cacheKey = buildCacheKey("player", playerId, season);
     const cached = await getCached(cacheKey);
     if (cached) {
-      res.json(cached);
+      // res.json(cached);
+      ok(res, cached, {cached: true});
       return;
     }
 
-    const raw = await fetchFromApiFootball(
+    const raw: any = await fetchFromApiFootball(
       "players",
       {id: playerId, season},
       API_FOOTBALL_KEY.value()
     );
 
-    const player = normalizeTeamPlayer(raw[0]);
+    if (!raw.response?.length) {
+      throw new Error("Empty player response");
+    }
+
+    const player = normalizeTeamPlayer(raw.response[0]);
     // await setCached(cacheKey, player, 12 * 60 * 60);
     await setCached(cacheKey, player, CACHE_TTL.player);
-    res.json(player);
+    // res.json(player);
+    ok(res, player, {cached: false});
   })
 );

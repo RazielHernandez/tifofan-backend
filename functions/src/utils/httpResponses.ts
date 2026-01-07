@@ -9,8 +9,43 @@ import {ApiError} from "./apiError";
  * @param {Response} res Express response
  * @param {T} data Response data
  */
-export function ok<T>(res:Response, data:T):void {
+/* export function ok<T>(res:Response, data:T):void {
   res.status(200).json({data});
+} */
+
+/**
+ * Sends a successful JSON response wrapper.
+ *
+ * @template T
+ * @param {T} data - Response data
+ * @param {Object} [options] - Options for response
+ * @param {boolean} [options.cached] - Cached flag
+ * @param {{
+ *   page: number,
+ *   totalPages: number,
+ *   hasNext: boolean
+ * }} [options.pagination] - Pagination info
+ * @return {Object} Response object
+ */
+export function ok<T>(
+  data: T,
+  options?: {
+    cached?: boolean;
+    pagination?: {
+      page: number;
+      totalPages: number;
+      hasNext: boolean;
+    };
+  }
+) {
+  return {
+    data,
+    meta: {
+      cached: options?.cached ?? false,
+      timestamp: Date.now(),
+    },
+    ...(options?.pagination ? {pagination: options.pagination} : {}),
+  };
 }
 
 /**
