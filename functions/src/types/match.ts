@@ -24,3 +24,11 @@ export interface NormalizedMatchDetails extends NormalizedMatch {
   halftimeScore?: string;
   fulltimeScore?: string;
 }
+
+
+export interface MatchTeamStatistics {
+  teamId:number;
+  teamName:string;
+  logo:string;
+  stats:Record<string, number | string | null>;
+}

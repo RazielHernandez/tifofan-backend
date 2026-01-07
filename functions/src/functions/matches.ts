@@ -11,6 +11,9 @@ import {
   normalizeMatch,
   normalizeMatchDetails,
 } from "../normalizers/matchNormalize";
+import {
+  normalizeMatchStatistics,
+} from "../normalizers/matchStatisticsNormalizer";
 import {ok} from "../utils/response";
 
 const API_FOOTBALL_KEY = defineSecret("API_FOOTBALL_KEY");
@@ -110,5 +113,50 @@ export const getMatchDetails = onRequest(
     const match = normalizeMatchDetails(raw.response[0]);
     await setCached(cacheKey, match, CACHE_TTL.matchDetails);
     ok(res, match, {cached: false});
+  })
+);
+
+
+/**
+ * Returns match statistics by fixture ID.
+ *
+ * @example
+ * GET /getMatchStatistics?fixture=215662
+ */
+export const getMatchStatistics = onRequest(
+  {secrets: [API_FOOTBALL_KEY]},
+  handler(async (req, res)=>{
+    const fixture = getNumberParam(req.query.fixture, "fixture");
+
+    const cacheKey = buildCacheKey(
+      "matchStats",
+      fixture
+    );
+
+    const cached = await getCached<any[]>(cacheKey);
+    if (cached) {
+      ok(res, cached, {cached: true});
+      return;
+    }
+
+    const raw:any = await fetchFromApiFootball(
+      "fixtures/statistics",
+      {fixture},
+      API_FOOTBALL_KEY.value()
+    );
+
+    if (!Array.isArray(raw.response) || raw.response.length === 0) {
+      throw new Error("Empty match statistics response");
+    }
+
+    const normalized = raw.response.map(normalizeMatchStatistics);
+
+    await setCached(
+      cacheKey,
+      normalized,
+      CACHE_TTL.matchDetails
+    );
+
+    ok(res, normalized, {cached: false});
   })
 );
