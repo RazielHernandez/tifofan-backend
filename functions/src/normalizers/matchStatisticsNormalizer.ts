@@ -1,4 +1,6 @@
 import {MatchTeamStatistics} from "../types/match";
+import {TeamCore} from "../types/team";
+import {STAT_MAP} from "../constants/stats";
 
 /**
  * Normalizes match statistics for a single team.
@@ -7,22 +9,33 @@ import {MatchTeamStatistics} from "../types/match";
  * @return {MatchTeamStatistics} Normalized team statistics
  */
 export function normalizeMatchStatistics(
-  raw:any
-):MatchTeamStatistics {
+  raw: any
+): MatchTeamStatistics {
   if (!raw?.team || !Array.isArray(raw.statistics)) {
     throw new Error("Invalid match statistics response");
   }
 
-  const stats:Record<string, number | string | null> = {};
+  const team: TeamCore = {
+    id: raw.team.id,
+    name: raw.team.name,
+    logo: raw.team.logo,
+  };
+
+  const stats: Record<string, number | null> = {};
 
   for (const item of raw.statistics) {
-    stats[item.type] = item.value ?? null;
+    const key = STAT_MAP[item.type];
+    if (!key) continue;
+
+    if (typeof item.value === "string" && item.value.endsWith("%")) {
+      stats[key] = Number(item.value.replace("%", ""));
+    } else {
+      stats[key] = item.value ?? null;
+    }
   }
 
   return {
-    teamId: raw.team.id,
-    teamName: raw.team.name,
-    logo: raw.team.logo,
+    team,
     stats,
   };
 }

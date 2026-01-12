@@ -12,7 +12,7 @@ import {Team} from "../types/team";
 import {handler} from "../utils/handler";
 import {getNumberParam} from "../utils/queryHelpers";
 import {ok} from "../utils/response";
-
+import {TeamCore} from "../types/team";
 const API_FOOTBALL_KEY = defineSecret("API_FOOTBALL_KEY");
 
 /* -------------------------------------------------------------------------- */
@@ -58,6 +58,52 @@ export const getTeam = onRequest(
   })
 );
 
+// /**
+//  * Returns team statistics by league and season.
+//  *
+//  * @example
+//  * GET /getTeamDetails?team=33&league=39&season=2024
+//  */
+// export const getTeamDetails = onRequest(
+//   {secrets: [API_FOOTBALL_KEY]},
+//   handler(async (req, res) => {
+//     const team = getNumberParam(req.query.team, "team");
+//     const league = getNumberParam(req.query.league, "league");
+//     const season = getNumberParam(req.query.season, "season");
+
+//     // const cacheKey = `team_stats_${team}_${league}_${season}`;
+//     const cacheKey = buildCacheKey("teamDetails", team, league, season);
+//     const cached = await getCached(cacheKey);
+//     if (cached) {
+//       // res.json(cached);
+//       ok(res, cached, {cached: true});
+//       return;
+//     }
+
+//     const raw: any = await fetchFromApiFootball(
+//       "teams/statistics",
+//       {team, league, season},
+//       API_FOOTBALL_KEY.value()
+//     );
+
+//     if (!raw.response) {
+//       throw new Error("Empty team statistics response");
+//     }
+
+//     const normalized = normalizeTeamStats(
+//       raw.response,
+//       team,
+//       league,
+//       season
+//     );
+
+//     // await setCached(cacheKey, normalized, 24 * 60 * 60);
+//     await setCached(cacheKey, normalized, CACHE_TTL.teamDetails);
+//     // res.json(normalized);
+//     ok(res, normalized, {cached: false});
+//   })
+// );
+
 /**
  * Returns team statistics by league and season.
  *
@@ -67,22 +113,21 @@ export const getTeam = onRequest(
 export const getTeamDetails = onRequest(
   {secrets: [API_FOOTBALL_KEY]},
   handler(async (req, res) => {
-    const team = getNumberParam(req.query.team, "team");
-    const league = getNumberParam(req.query.league, "league");
+    const teamId = getNumberParam(req.query.team, "team");
+    const leagueId = getNumberParam(req.query.league, "league");
     const season = getNumberParam(req.query.season, "season");
 
-    // const cacheKey = `team_stats_${team}_${league}_${season}`;
-    const cacheKey = buildCacheKey("teamDetails", team, league, season);
+    const cacheKey = buildCacheKey("teamDetails", teamId, leagueId, season);
     const cached = await getCached(cacheKey);
     if (cached) {
-      // res.json(cached);
       ok(res, cached, {cached: true});
       return;
     }
 
+    // Fetch raw statistics
     const raw: any = await fetchFromApiFootball(
       "teams/statistics",
-      {team, league, season},
+      {team: teamId, league: leagueId, season},
       API_FOOTBALL_KEY.value()
     );
 
@@ -90,19 +135,33 @@ export const getTeamDetails = onRequest(
       throw new Error("Empty team statistics response");
     }
 
+    const teamDataRaw = raw.response.team;
+    if (!teamDataRaw?.id || !teamDataRaw?.name) {
+      throw new Error("Invalid team data in statistics response");
+    }
+
+    // Build TeamCore object
+    const teamCore: TeamCore = {
+      id: teamDataRaw.id,
+      name: teamDataRaw.name,
+      logo: teamDataRaw.logo ?? null,
+      country: teamDataRaw.country ?? null,
+    };
+
+    // Normalize team stats using TeamCore
     const normalized = normalizeTeamStats(
       raw.response,
-      team,
-      league,
+      teamCore,
+      leagueId,
       season
     );
 
-    // await setCached(cacheKey, normalized, 24 * 60 * 60);
     await setCached(cacheKey, normalized, CACHE_TTL.teamDetails);
-    // res.json(normalized);
+
     ok(res, normalized, {cached: false});
   })
 );
+
 
 /**
  * Returns players of a team for a given season.

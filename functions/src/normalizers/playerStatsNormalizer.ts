@@ -1,37 +1,51 @@
-import {NormalizedPlayerStats} from "../types/player";
+import {PlayerSeasonStats} from "../types/player";
+import {TeamCore} from "../types/team";
 
 /**
  * Normalizes API-Football player statistics object.
  *
- * @param {any}stats Raw statistics object from API-Football.
+ * @param {any} raw Raw statistics object from API-Football.
  * @return {NormalizedPlayerStats} Normalized player statistics.
  */
-export function normalizePlayerStats(stats:any):NormalizedPlayerStats {
-  if (!stats || !stats.team || !stats.league) {
+export function normalizePlayerSeasonStats(raw: any): PlayerSeasonStats {
+  if (!raw?.team || !raw?.league) {
     throw new Error("Invalid player statistics response");
   }
 
+  const team: TeamCore = {
+    id: raw.team.id,
+    name: raw.team.name,
+    logo: raw.team.logo ?? null,
+    country: raw.team.country ?? null,
+  };
+
   return {
-    teamId: stats.team.id,
-    teamName: stats.team.name,
-    teamLogo: stats.team.logo,
+    team,
 
-    leagueId: stats.league.id,
-    leagueName: stats.league.name,
-    season: stats.league.season,
+    leagueId: raw.league.id,
+    leagueName: raw.league.name,
+    season: raw.league.season,
 
-    appearances: stats.games?.appearences ?? 0,
-    minutes: stats.games?.minutes ?? 0,
-    position: stats.games?.position ?? "",
-    rating: stats.games?.rating ? Number(stats.games.rating) : null,
+    // Games
+    appearances: raw.games?.appearences ?? 0,
+    minutes: raw.games?.minutes ?? 0,
+    position: raw.games?.position ?? "",
+    rating: raw.games?.rating != null ?
+      Number(raw.games.rating) :
+      null,
 
-    goals: stats.goals?.total ?? 0,
-    assists: stats.goals?.assists ?? 0,
+    // Goals
+    goals: raw.goals?.total ?? 0,
+    assists: raw.goals?.assists ?? 0,
 
-    passes: stats.passes?.total ?? 0,
-    passAccuracy: stats.passes?.accuracy ? Number(stats.passes.accuracy) : null,
+    // Passing
+    passes: raw.passes?.total ?? 0,
+    passAccuracy: raw.passes?.accuracy != null ?
+      Number(raw.passes.accuracy) :
+      null,
 
-    yellowCards: stats.cards?.yellow ?? 0,
-    redCards: stats.cards?.red ?? 0,
+    // Discipline
+    yellowCards: raw.cards?.yellow ?? 0,
+    redCards: raw.cards?.red ?? 0,
   };
 }

@@ -1,4 +1,5 @@
 import {NormalizedMatch, NormalizedMatchDetails} from "../types/match";
+import {TeamCore} from "../types/team";
 
 /**
  * Normalizes a match response from API-Football.
@@ -7,9 +8,26 @@ import {NormalizedMatch, NormalizedMatchDetails} from "../types/match";
  * @return {NormalizedMatch} Normalized team.
  */
 export function normalizeMatch(fixture: any): NormalizedMatch {
-  if (!fixture?.fixture || !fixture?.teams) {
+  if (
+    !fixture?.fixture ||
+    !fixture?.teams?.home ||
+    !fixture?.teams?.away ||
+    !fixture?.league
+  ) {
     throw new Error("Invalid match response");
   }
+
+  const homeTeam: TeamCore = {
+    id: fixture.teams.home.id,
+    name: fixture.teams.home.name,
+    logo: fixture.teams.home.logo,
+  };
+
+  const awayTeam: TeamCore = {
+    id: fixture.teams.away.id,
+    name: fixture.teams.away.name,
+    logo: fixture.teams.away.logo,
+  };
 
   return {
     id: fixture.fixture.id,
@@ -17,17 +35,15 @@ export function normalizeMatch(fixture: any): NormalizedMatch {
     season: fixture.league.season,
     date: fixture.fixture.date,
     status: fixture.fixture.status.short,
-    homeTeam: {
-      id: fixture.teams.home.id,
-      name: fixture.teams.home.name,
-      logo: fixture.teams.home.logo,
-      goals: fixture.goals.home,
+
+    home: {
+      team: homeTeam,
+      goals: fixture.goals?.home ?? null,
     },
-    awayTeam: {
-      id: fixture.teams.away.id,
-      name: fixture.teams.away.name,
-      logo: fixture.teams.away.logo,
-      goals: fixture.goals.away,
+
+    away: {
+      team: awayTeam,
+      goals: fixture.goals?.away ?? null,
     },
   };
 }
@@ -39,16 +55,20 @@ export function normalizeMatch(fixture: any): NormalizedMatch {
  * @param {any} fixture Raw API-Football team item.
  * @return {NormalizedMatchDetails} Normalized team.
  */
-export function normalizeMatchDetails(fixture: any): NormalizedMatchDetails {
+export function normalizeMatchDetails(
+  fixture: any
+): NormalizedMatchDetails {
   const base = normalizeMatch(fixture);
 
   return {
     ...base,
-    venue: fixture.fixture.venue?.name,
-    referee: fixture.fixture.referee,
+    venue: fixture.fixture.venue?.name ?? undefined,
+    referee: fixture.fixture.referee ?? undefined,
+
     halftimeScore: fixture.score?.halftime ?
       `${fixture.score.halftime.home}-${fixture.score.halftime.away}` :
       undefined,
+
     fulltimeScore: fixture.score?.fulltime ?
       `${fixture.score.fulltime.home}-${fixture.score.fulltime.away}` :
       undefined,
