@@ -8,6 +8,8 @@ import {normalizeTeamPlayer} from "../normalizers/teamPlayersNormalizer";
 import {handler} from "../utils/handler";
 import {getNumberParam} from "../utils/queryHelpers";
 import {ok} from "../utils/response";
+import {
+  aggregatePlayerSeasonStats} from "../aggregators/playerSeasonAggregates";
 
 const API_FOOTBALL_KEY = defineSecret("API_FOOTBALL_KEY");
 
@@ -26,12 +28,9 @@ export const getPlayer = onRequest(
   handler(async (req, res) => {
     const playerId = getNumberParam(req.query.id, "id");
     const season = getNumberParam(req.query.season, "season");
-
-    // const cacheKey = `player_${playerId}_${season}`;
     const cacheKey = buildCacheKey("player", playerId, season);
     const cached = await getCached(cacheKey);
     if (cached) {
-      // res.json(cached);
       ok(res, cached, {cached: true});
       return;
     }
@@ -46,10 +45,33 @@ export const getPlayer = onRequest(
       throw new Error("Empty player response");
     }
 
-    const player = normalizeTeamPlayer(raw.response[0]);
-    // await setCached(cacheKey, player, 12 * 60 * 60);
-    await setCached(cacheKey, player, CACHE_TTL.player);
-    // res.json(player);
-    ok(res, player, {cached: false});
+    // const player = normalizeTeamPlayer(raw.response[0]);
+    // await setCached(cacheKey, player, CACHE_TTL.player);
+    // ok(res, player, {cached: false});
+
+    // Normalize (PlayerWithSeasonStats)
+    const normalizedPlayer = normalizeTeamPlayer(raw.response[0]);
+
+    // Aggregate season stats
+    const aggregates = aggregatePlayerSeasonStats(
+      normalizedPlayer.stats
+    );
+
+    const response = {
+      player: {
+        id: normalizedPlayer.id,
+        name: normalizedPlayer.name,
+        photo: normalizedPlayer.photo,
+        age: normalizedPlayer.age,
+        nationality: normalizedPlayer.nationality,
+      },
+      season,
+      stats: normalizedPlayer.stats,
+      aggregates,
+    };
+
+    await setCached(cacheKey, response, CACHE_TTL.player);
+
+    ok(res, response, {cached: false});
   })
 );

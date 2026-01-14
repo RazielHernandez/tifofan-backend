@@ -8,11 +8,11 @@ import {CACHE_TTL} from "../cache/cacheConfig";
 import {normalizeTeam} from "../normalizers/teamNormalizer";
 import {normalizeTeamStats} from "../normalizers/teamStatsNormalizer";
 import {normalizeTeamPlayer} from "../normalizers/teamPlayersNormalizer";
-import {Team} from "../types/team";
+import {Team, TeamCore} from "../types/team";
 import {handler} from "../utils/handler";
 import {getNumberParam} from "../utils/queryHelpers";
 import {ok} from "../utils/response";
-import {TeamCore} from "../types/team";
+import {aggregateTeamSeasonStats} from "../aggregators/teamSeassonAgregates";
 const API_FOOTBALL_KEY = defineSecret("API_FOOTBALL_KEY");
 
 /* -------------------------------------------------------------------------- */
@@ -58,52 +58,6 @@ export const getTeam = onRequest(
   })
 );
 
-// /**
-//  * Returns team statistics by league and season.
-//  *
-//  * @example
-//  * GET /getTeamDetails?team=33&league=39&season=2024
-//  */
-// export const getTeamDetails = onRequest(
-//   {secrets: [API_FOOTBALL_KEY]},
-//   handler(async (req, res) => {
-//     const team = getNumberParam(req.query.team, "team");
-//     const league = getNumberParam(req.query.league, "league");
-//     const season = getNumberParam(req.query.season, "season");
-
-//     // const cacheKey = `team_stats_${team}_${league}_${season}`;
-//     const cacheKey = buildCacheKey("teamDetails", team, league, season);
-//     const cached = await getCached(cacheKey);
-//     if (cached) {
-//       // res.json(cached);
-//       ok(res, cached, {cached: true});
-//       return;
-//     }
-
-//     const raw: any = await fetchFromApiFootball(
-//       "teams/statistics",
-//       {team, league, season},
-//       API_FOOTBALL_KEY.value()
-//     );
-
-//     if (!raw.response) {
-//       throw new Error("Empty team statistics response");
-//     }
-
-//     const normalized = normalizeTeamStats(
-//       raw.response,
-//       team,
-//       league,
-//       season
-//     );
-
-//     // await setCached(cacheKey, normalized, 24 * 60 * 60);
-//     await setCached(cacheKey, normalized, CACHE_TTL.teamDetails);
-//     // res.json(normalized);
-//     ok(res, normalized, {cached: false});
-//   })
-// );
-
 /**
  * Returns team statistics by league and season.
  *
@@ -148,17 +102,38 @@ export const getTeamDetails = onRequest(
       country: teamDataRaw.country ?? null,
     };
 
-    // Normalize team stats using TeamCore
-    const normalized = normalizeTeamStats(
+    // // Normalize team stats using TeamCore
+    // const normalized = normalizeTeamStats(
+    //   raw.response,
+    //   teamCore,
+    //   leagueId,
+    //   season
+    // );
+
+    // await setCached(cacheKey, normalized, CACHE_TTL.teamDetails);
+
+    // ok(res, normalized, {cached: false});
+
+    const stats = normalizeTeamStats(
       raw.response,
       teamCore,
       leagueId,
       season
     );
 
-    await setCached(cacheKey, normalized, CACHE_TTL.teamDetails);
+    const aggregates = aggregateTeamSeasonStats(stats);
 
-    ok(res, normalized, {cached: false});
+    const response = {
+      team: teamCore,
+      leagueId,
+      season,
+      stats,
+      aggregates,
+    };
+
+    await setCached(cacheKey, response, CACHE_TTL.teamDetails);
+
+    ok(res, response, {cached: false});
   })
 );
 
@@ -235,3 +210,36 @@ export const getTeamPlayers = onRequest(
     });
   })
 );
+
+export type MatchResult = "W" | "D" | "L";
+
+/**
+ * Derives a team's recent form string from matches, e.g. "WWDL".
+ *
+ * @param {Match[]} matches Array of results with home/away goals and team ids.
+ * @param {Team} teamId Team id to compute form for.
+ * @param {Number} limit Number of recent matches to include (default 5).
+ * @return {String} of results with "W", "D", "L".
+ */
+export function deriveTeamForm(
+  matches: {
+    homeTeamId: number;
+    awayTeamId: number;
+    homeGoals: number;
+    awayGoals: number;
+  }[],
+  teamId: number,
+  limit = 5
+): string {
+  return matches
+    .slice(-limit)
+    .map((m) => {
+      const isHome = m.homeTeamId === teamId;
+      const goalsFor = isHome ? m.homeGoals : m.awayGoals;
+      const goalsAgainst = isHome ? m.awayGoals : m.homeGoals;
+      if (goalsFor > goalsAgainst) return "W";
+      if (goalsFor < goalsAgainst) return "L";
+      return "D";
+    })
+    .join("");
+}
