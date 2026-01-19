@@ -1,6 +1,5 @@
 import {onRequest} from "firebase-functions/v2/https";
 import {defineSecret} from "firebase-functions/params";
-
 import {fetchFromApiFootball} from "../api/apiFootball";
 import {getCached, setCached} from "../cache/firestoreCache";
 import {buildCacheKey} from "../cache/cacheKeys";
@@ -13,6 +12,7 @@ import {handler} from "../utils/handler";
 import {getNumberParam} from "../utils/queryHelpers";
 import {ok} from "../utils/response";
 import {aggregateTeamSeasonStats} from "../aggregators/teamSeassonAgregates";
+
 const API_FOOTBALL_KEY = defineSecret("API_FOOTBALL_KEY");
 
 /* -------------------------------------------------------------------------- */
@@ -55,7 +55,7 @@ export const getTeam = onRequest(
     await setCached(cacheKey, normalized, CACHE_TTL.team);
     // res.json(normalized);
     ok(res, normalized, {cached: false});
-  })
+  }, "getTeam")
 );
 
 /**
@@ -102,18 +102,6 @@ export const getTeamDetails = onRequest(
       country: teamDataRaw.country ?? null,
     };
 
-    // // Normalize team stats using TeamCore
-    // const normalized = normalizeTeamStats(
-    //   raw.response,
-    //   teamCore,
-    //   leagueId,
-    //   season
-    // );
-
-    // await setCached(cacheKey, normalized, CACHE_TTL.teamDetails);
-
-    // ok(res, normalized, {cached: false});
-
     const stats = normalizeTeamStats(
       raw.response,
       teamCore,
@@ -134,7 +122,7 @@ export const getTeamDetails = onRequest(
     await setCached(cacheKey, response, CACHE_TTL.teamDetails);
 
     ok(res, response, {cached: false});
-  })
+  }, "getTeamDetails")
 );
 
 
@@ -208,7 +196,7 @@ export const getTeamPlayers = onRequest(
       cached: false,
       pagination,
     });
-  })
+  }, "getTeamPlayers")
 );
 
 export type MatchResult = "W" | "D" | "L";

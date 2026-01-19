@@ -73,5 +73,5 @@ export const getPlayer = onRequest(
     await setCached(cacheKey, response, CACHE_TTL.player);
 
     ok(res, response, {cached: false});
-  })
+  }, "getPlayer")
 );

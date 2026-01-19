@@ -78,7 +78,7 @@ export const getMatches = onRequest(
       cached: Boolean(cached),
       pagination,
     });
-  })
+  }, "getMatches")
 );
 
 
@@ -113,7 +113,7 @@ export const getMatchDetails = onRequest(
     const match = normalizeMatchDetails(raw.response[0]);
     await setCached(cacheKey, match, CACHE_TTL.matchDetails);
     ok(res, match, {cached: false});
-  })
+  }, "getMatchDetails")
 );
 
 
@@ -158,5 +158,5 @@ export const getMatchStatistics = onRequest(
     );
 
     ok(res, normalized, {cached: false});
-  })
+  }, "getMatchStatistics")
 );
