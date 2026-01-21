@@ -12,7 +12,7 @@ import {normalizeTeamCore} from "./teamNormalizer";
  */
 export function normalizeTeamPlayer(item: any): PlayerWithSeasonStats {
   if (!item?.player?.id || !item?.player?.name) {
-    throw new Error("Invalid team player response");
+    throw new Error("Invalid player response");
   }
 
   return {
