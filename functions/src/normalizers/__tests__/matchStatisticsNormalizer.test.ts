@@ -18,20 +18,6 @@ describe("normalizeMatchStatistics", () => {
 
     const result = normalizeMatchStatistics(raw);
 
-    // expect(result).toEqual({
-    //   team: {
-    //     id: 33,
-    //     name: "Barcelona",
-    //     logo: "barca.png",
-    //   },
-    //   stats: {
-    //     "Shots on Goal": 5,
-    //     "Shots off Goal": 7,
-    //     "Possession": "60%",
-    //     "Yellow Cards": 2,
-    //   },
-    // });
-
     expect(result).toEqual({
       team: {
         id: 33,

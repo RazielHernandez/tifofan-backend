@@ -32,16 +32,8 @@ export function rateLimit(
 
   if (entry.count >= limit) {
     const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
-    // const error = new Error("Too many requests") as Error & {
-    //   code: string;
-    //   status: number;
-    //   retryAfter: number;
-    // };
     const error = new ApiError(
       429, "rate_limited", "Too many requests", retryAfter);
-    // error.code = "rate_limited";
-    // error.status = 429;
-    // error.retryAfter = retryAfter;
     throw error;
   }
 

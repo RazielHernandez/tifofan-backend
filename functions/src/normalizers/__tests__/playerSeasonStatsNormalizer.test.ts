@@ -1,4 +1,4 @@
-import {normalizePlayerSeasonStats} from "../playerStatsNormalizer";
+import {normalizePlayerSeasonStats} from "../playerSeasonStatsNormalizer";
 import {PlayerSeasonStats} from "../../types/player";
 
 describe("normalizePlayerSeasonStats", () => {

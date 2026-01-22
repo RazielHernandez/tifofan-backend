@@ -20,6 +20,7 @@ export const CACHE_VERSION = {
  * player: 12 * 60 * 60,         // 12h – bio mostly static
  * matches: 2 * 60,              // 2 min – live data
  * matchDetails: 1 * 60,         // 1 min – very dynamic
+ * matchStats: 1 * 60,           // 1 min – very dynamic
  */
 export const CACHE_TTL = {
   team: 24 * 60 * 60,

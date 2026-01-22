@@ -1,51 +1,6 @@
-// import type {Request, Response} from "express";
-// import {fail} from "./httpResponses";
 import {rateLimit} from "./rateLimiter";
 import {resolveRateLimit} from "./rateLimitResolver";
 import {ApiError} from "./apiError";
-
-// /**
-//  * Wraps an HTTPS function with centralized error handling.
-//  *
-//  * @param {Function} fn Function handler
-//  * @return {Function} Wrapped handler
-//  */
-// export function handler(
-//   fn:(req:Request, res:Response) => Promise<void>
-// ):(req:Request, res:Response) => Promise<void> {
-//   return async (req, res) => {
-//     try {
-//       await fn(req, res);
-//     } catch (error) {
-//       fail(res, error);
-//     }
-//   };
-// }
-
-// /**
-//  * Wraps an HTTPS function with centralized error handling and rate limiting.
-//  *
-//  * @param {Function} fn Function handler
-//  * @param {string} endpointName Optional endpoint name for rate limiting
-//  * @return {Function} Wrapped handler
-//  */
-// export function handler(
-//   fn: (req: Request, res: Response) => Promise<void>,
-//   endpointName?: string
-// ) {
-//   return async (req: Request, res: Response) => {
-//     try {
-//       if (endpointName) {
-//         const {key, limit, windowMs} = resolveRateLimit(req, endpointName);
-//         rateLimit(key, limit, windowMs);
-//       }
-
-//       await fn(req, res);
-//     } catch (error) {
-//       fail(res, error);
-//     }
-//   };
-// }
 
 /**
  * Wraps an HTTPS function with centralized error handling and rate limiting.

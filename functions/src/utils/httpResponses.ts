@@ -3,17 +3,6 @@ import * as logger from "firebase-functions/logger";
 import {ApiError} from "./apiError";
 
 /**
- * Sends a successful JSON response.
- *
- * @template T
- * @param {Response} res Express response
- * @param {T} data Response data
- */
-/* export function ok<T>(res:Response, data:T):void {
-  res.status(200).json({data});
-} */
-
-/**
  * Sends a successful JSON response wrapper.
  *
  * @template T
