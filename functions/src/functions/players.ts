@@ -45,10 +45,6 @@ export const getPlayer = onRequest(
       throw new Error("Empty player response");
     }
 
-    // const player = normalizeTeamPlayer(raw.response[0]);
-    // await setCached(cacheKey, player, CACHE_TTL.player);
-    // ok(res, player, {cached: false});
-
     // Normalize (PlayerWithSeasonStats)
     const normalizedPlayer = normalizeTeamPlayer(raw.response[0]);
 
