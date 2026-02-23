@@ -1,4 +1,4 @@
-import {onRequest} from "firebase-functions/v2/https";
+import {onRequest, onCall, HttpsError} from "firebase-functions/v2/https";
 import {defineSecret} from "firebase-functions/params";
 
 import {fetchFromApiFootball} from "../api/apiFootball";
@@ -160,3 +160,143 @@ export const getMatchStatistics = onRequest(
     ok(res, normalized, {cached: false});
   }, "getMatchStatistics")
 );
+
+
+/* -------------------------------------------------------------------------- */
+/*                                Callables                                   */
+/* -------------------------------------------------------------------------- */
+
+export const getMatchesCallable = onCall(
+  {secrets: [API_FOOTBALL_KEY]},
+  async (request) => {
+    const league = Number(request.data.league);
+    const season = Number(request.data.season);
+    const page = Number(request.data.page ?? 1);
+
+    if (!league || !season) {
+      throw new HttpsError(
+        "invalid-argument",
+        "league and season are required"
+      );
+    }
+
+    const PER_PAGE = 20;
+    const cacheKey = buildCacheKey("matches", league, season);
+
+    const cached = await getCached<any[]>(cacheKey);
+    let matches: any[];
+
+    if (cached) {
+      matches = cached;
+    } else {
+      const raw: any = await fetchFromApiFootball(
+        "fixtures",
+        {league, season},
+        API_FOOTBALL_KEY.value()
+      );
+
+      matches = raw.response.map(normalizeMatch);
+      await setCached(cacheKey, matches, CACHE_TTL.matches);
+    }
+
+    const start = (page - 1) * PER_PAGE;
+    const paged = matches.slice(start, start + PER_PAGE);
+
+    return {
+      items: paged,
+      pagination: {
+        page,
+        perPage: PER_PAGE,
+        totalItems: matches.length,
+        totalPages: Math.ceil(matches.length / PER_PAGE),
+        hasNext: page * PER_PAGE < matches.length,
+      },
+      cached: Boolean(cached),
+    };
+  }
+);
+
+export const getMatchDetailsCallable = onCall(
+  {secrets: [API_FOOTBALL_KEY]},
+  async (request) => {
+    const matchId = Number(request.data.fixture);
+
+    if (!matchId) {
+      throw new HttpsError(
+        "invalid-argument",
+        "fixture is required"
+      );
+    }
+
+    const cacheKey = buildCacheKey("matchDetails", matchId);
+    const cached = await getCached(cacheKey);
+
+    if (cached) {
+      return {item: cached, cached: true};
+    }
+
+    const raw: any = await fetchFromApiFootball(
+      "fixtures",
+      {id: matchId},
+      API_FOOTBALL_KEY.value()
+    );
+
+    if (!raw.response?.length) {
+      throw new HttpsError(
+        "not-found",
+        "Match not found"
+      );
+    }
+
+    const match = normalizeMatchDetails(raw.response[0]);
+
+    await setCached(cacheKey, match, CACHE_TTL.matchDetails);
+
+    return {item: match, cached: false};
+  }
+);
+
+export const getMatchStatisticsCallable = onCall(
+  {secrets: [API_FOOTBALL_KEY]},
+  async (request) => {
+    const fixture = Number(request.data.fixture);
+
+    if (!fixture) {
+      throw new HttpsError(
+        "invalid-argument",
+        "fixture is required"
+      );
+    }
+
+    const cacheKey = buildCacheKey("matchStats", fixture);
+
+    const cached = await getCached<any[]>(cacheKey);
+    if (cached) {
+      return {items: cached, cached: true};
+    }
+
+    const raw: any = await fetchFromApiFootball(
+      "fixtures/statistics",
+      {fixture},
+      API_FOOTBALL_KEY.value()
+    );
+
+    if (!Array.isArray(raw.response) || raw.response.length === 0) {
+      throw new HttpsError(
+        "not-found",
+        "Match statistics not found"
+      );
+    }
+
+    const normalized = raw.response.map(normalizeMatchStatistics);
+
+    await setCached(
+      cacheKey,
+      normalized,
+      CACHE_TTL.matchDetails
+    );
+
+    return {items: normalized, cached: false};
+  }
+);
+

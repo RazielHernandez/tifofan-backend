@@ -1,4 +1,4 @@
-import {onRequest} from "firebase-functions/v2/https";
+import {onRequest, onCall, HttpsError} from "firebase-functions/v2/https";
 import {defineSecret} from "firebase-functions/params";
 import {fetchFromApiFootball} from "../api/apiFootball";
 import {getCached, setCached} from "../cache/firestoreCache";
@@ -70,4 +70,69 @@ export const getPlayer = onRequest(
 
     ok(res, response, {cached: false});
   }, "getPlayer")
+);
+
+
+/* -------------------------------------------------------------------------- */
+/*                                  Callables                                 */
+/* -------------------------------------------------------------------------- */
+
+export const getPlayerCallable = onCall(
+  {secrets: [API_FOOTBALL_KEY]},
+  async (request) => {
+    const playerId = Number(request.data.id);
+    const season = Number(request.data.season);
+
+    if (!playerId || !season) {
+      throw new HttpsError(
+        "invalid-argument",
+        "id and season are required"
+      );
+    }
+
+    const cacheKey = buildCacheKey("player", playerId, season);
+    const cached = await getCached(cacheKey);
+
+    if (cached) {
+      return {...cached, cached: true};
+    }
+
+    const raw: any = await fetchFromApiFootball(
+      "players",
+      {id: playerId, season},
+      API_FOOTBALL_KEY.value()
+    );
+
+    if (!raw.response?.length) {
+      throw new HttpsError(
+        "not-found",
+        "Player not found"
+      );
+    }
+
+    // Normalize
+    const normalizedPlayer = normalizeTeamPlayer(raw.response[0]);
+
+    // Aggregate season stats
+    const aggregates = aggregatePlayerSeasonStats(
+      normalizedPlayer.stats
+    );
+
+    const response = {
+      player: {
+        id: normalizedPlayer.id,
+        name: normalizedPlayer.name,
+        photo: normalizedPlayer.photo,
+        age: normalizedPlayer.age,
+        nationality: normalizedPlayer.nationality,
+      },
+      season,
+      stats: normalizedPlayer.stats,
+      aggregates,
+    };
+
+    await setCached(cacheKey, response, CACHE_TTL.player);
+
+    return {...response, cached: false};
+  }
 );
