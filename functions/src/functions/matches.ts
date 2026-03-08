@@ -14,7 +14,7 @@ import {
 import {
   normalizeMatchStatistics,
 } from "../normalizers/matchStatisticsNormalizer";
-import {ok} from "../utils/response";
+import {buildResponse, ok} from "../utils/response";
 
 const API_FOOTBALL_KEY = defineSecret("API_FOOTBALL_KEY");
 
@@ -202,8 +202,19 @@ export const getMatchesCallable = onCall(
     const start = (page - 1) * PER_PAGE;
     const paged = matches.slice(start, start + PER_PAGE);
 
-    return {
-      items: paged,
+    // return {
+    //   items: paged,
+    //   pagination: {
+    //     page,
+    //     perPage: PER_PAGE,
+    //     totalItems: matches.length,
+    //     totalPages: Math.ceil(matches.length / PER_PAGE),
+    //     hasNext: page * PER_PAGE < matches.length,
+    //   },
+    //   cached: Boolean(cached),
+    // };
+    return buildResponse(paged, {
+      cached: Boolean(cached),
       pagination: {
         page,
         perPage: PER_PAGE,
@@ -211,8 +222,7 @@ export const getMatchesCallable = onCall(
         totalPages: Math.ceil(matches.length / PER_PAGE),
         hasNext: page * PER_PAGE < matches.length,
       },
-      cached: Boolean(cached),
-    };
+    });
   }
 );
 
@@ -232,7 +242,8 @@ export const getMatchDetailsCallable = onCall(
     const cached = await getCached(cacheKey);
 
     if (cached) {
-      return {item: cached, cached: true};
+      // return {item: cached, cached: true};
+      return buildResponse(cached, {cached: true});
     }
 
     const raw: any = await fetchFromApiFootball(
@@ -252,7 +263,8 @@ export const getMatchDetailsCallable = onCall(
 
     await setCached(cacheKey, match, CACHE_TTL.matchDetails);
 
-    return {item: match, cached: false};
+    // return {item: match, cached: false};
+    return buildResponse(match, {cached: false});
   }
 );
 
@@ -272,7 +284,8 @@ export const getMatchStatisticsCallable = onCall(
 
     const cached = await getCached<any[]>(cacheKey);
     if (cached) {
-      return {items: cached, cached: true};
+      // return {items: cached, cached: true};
+      return buildResponse(cached, {cached: true});
     }
 
     const raw: any = await fetchFromApiFootball(
@@ -296,7 +309,8 @@ export const getMatchStatisticsCallable = onCall(
       CACHE_TTL.matchDetails
     );
 
-    return {items: normalized, cached: false};
+    // return {items: normalized, cached: false};
+    return buildResponse(normalized, {cached: false});
   }
 );
 

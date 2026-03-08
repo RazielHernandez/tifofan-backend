@@ -7,7 +7,7 @@ import {CACHE_TTL} from "../cache/cacheConfig";
 import {normalizeTeamPlayer} from "../normalizers/teamPlayersNormalizer";
 import {handler} from "../utils/handler";
 import {getNumberParam} from "../utils/queryHelpers";
-import {ok} from "../utils/response";
+import {buildResponse, ok} from "../utils/response";
 import {
   aggregatePlayerSeasonStats} from "../aggregators/playerSeasonAggregates";
 
@@ -94,7 +94,8 @@ export const getPlayerCallable = onCall(
     const cached = await getCached(cacheKey);
 
     if (cached) {
-      return {...cached, cached: true};
+      // return {...cached, cached: true};
+      return buildResponse(cached, {cached: true});
     }
 
     const raw: any = await fetchFromApiFootball(
@@ -133,6 +134,7 @@ export const getPlayerCallable = onCall(
 
     await setCached(cacheKey, response, CACHE_TTL.player);
 
-    return {...response, cached: false};
+    // return {...response, cached: false};
+    return buildResponse(response, {cached: false});
   }
 );

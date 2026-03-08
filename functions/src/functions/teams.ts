@@ -10,7 +10,7 @@ import {normalizeTeamPlayer} from "../normalizers/teamPlayersNormalizer";
 import {Team, TeamCore} from "../types/team";
 import {handler} from "../utils/handler";
 import {getNumberParam} from "../utils/queryHelpers";
-import {ok} from "../utils/response";
+import {buildResponse, ok} from "../utils/response";
 import {aggregateTeamSeasonStats} from "../aggregators/teamSeassonAgregates";
 
 const API_FOOTBALL_KEY = defineSecret("API_FOOTBALL_KEY");
@@ -219,7 +219,8 @@ export const getTeamCallable = onCall(
     const cached = await getCached(cacheKey);
 
     if (cached) {
-      return {team: cached, cached: true};
+      // return {team: cached, cached: true};
+      return buildResponse(cached, {cached: true});
     }
 
     const raw: any = await fetchFromApiFootball(
@@ -236,10 +237,9 @@ export const getTeamCallable = onCall(
     }
 
     const normalized: Team = normalizeTeam(raw.response[0]);
-
     await setCached(cacheKey, normalized, CACHE_TTL.team);
-
-    return {team: normalized, cached: false};
+    // return {team: normalized, cached: false};
+    return buildResponse(normalized, {cached: true});
   }
 );
 
@@ -267,7 +267,8 @@ export const getTeamDetailsCallable = onCall(
     const cached = await getCached(cacheKey);
 
     if (cached) {
-      return {...cached, cached: true};
+      // return {...cached, cached: true};
+      return buildResponse(cached, {cached: true});
     }
 
     const raw: any = await fetchFromApiFootball(
@@ -322,7 +323,8 @@ export const getTeamDetailsCallable = onCall(
       CACHE_TTL.teamDetails
     );
 
-    return {...response, cached: false};
+    // return {...response, cached: false};
+    return buildResponse(response, {cached: false});
   }
 );
 
@@ -360,11 +362,18 @@ export const getTeamPlayersCallable = onCall(
     }>(cacheKey);
 
     if (cached) {
-      return {
-        items: cached.data,
-        pagination: cached.pagination,
-        cached: true,
-      };
+      // return {
+      //   items: cached.data,
+      //   pagination: cached.pagination,
+      //   cached: true,
+      // };
+      return buildResponse(
+        cached.data,
+        {
+          cached: true,
+          pagination: cached.pagination,
+        }
+      );
     }
 
     const raw: any = await fetchFromApiFootball(
@@ -397,11 +406,18 @@ export const getTeamPlayersCallable = onCall(
       CACHE_TTL.teamPlayers
     );
 
-    return {
-      items: players,
-      pagination,
-      cached: false,
-    };
+    // return {
+    //   items: players,
+    //   pagination,
+    //   cached: false,
+    // };
+    return buildResponse(
+      players,
+      {
+        cached: false,
+        pagination,
+      }
+    );
   }
 );
 
