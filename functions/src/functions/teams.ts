@@ -12,6 +12,7 @@ import {handler} from "../utils/handler";
 import {getNumberParam} from "../utils/queryHelpers";
 import {buildResponse, ok} from "../utils/response";
 import {aggregateTeamSeasonStats} from "../aggregators/teamSeassonAgregates";
+import {safeFetch} from "../utils/safeFetch";
 
 const API_FOOTBALL_KEY = defineSecret("API_FOOTBALL_KEY");
 
@@ -71,59 +72,110 @@ export const getTeamDetails = onRequest(
     const leagueId = getNumberParam(req.query.league, "league");
     const season = getNumberParam(req.query.season, "season");
 
-    const cacheKey = buildCacheKey("teamDetails", teamId, leagueId, season);
-    const cached = await getCached(cacheKey);
-    if (cached) {
-      ok(res, cached, {cached: true});
-      return;
-    }
-
-    // Fetch raw statistics
-    const raw: any = await fetchFromApiFootball(
-      "teams/statistics",
-      {team: teamId, league: leagueId, season},
-      API_FOOTBALL_KEY.value()
-    );
-
-    if (!raw.response) {
-      throw new Error("Empty team statistics response");
-    }
-
-    const teamDataRaw = raw.response.team;
-    if (!teamDataRaw?.id || !teamDataRaw?.name) {
-      throw new Error("Invalid team data in statistics response");
-    }
-
-    // Build TeamCore object
-    const teamCore: TeamCore = {
-      id: teamDataRaw.id,
-      name: teamDataRaw.name,
-      logo: teamDataRaw.logo ?? null,
-      country: teamDataRaw.country ?? null,
-    };
-
-    const stats = normalizeTeamStats(
-      raw.response,
-      teamCore,
+    const cacheKey = buildCacheKey(
+      "teamDetails",
+      teamId,
       leagueId,
       season
     );
 
-    const aggregates = aggregateTeamSeasonStats(stats);
+    const {data, cached} = await safeFetch(
+      cacheKey,
+      CACHE_TTL.teamDetails,
+      async () => {
+        const raw: any = await fetchFromApiFootball(
+          "teams/statistics",
+          {team: teamId, league: leagueId, season},
+          API_FOOTBALL_KEY.value()
+        );
 
-    const response = {
-      team: teamCore,
-      leagueId,
-      season,
-      stats,
-      aggregates,
-    };
+        const teamCore = {
+          id: raw.response.team.id,
+          name: raw.response.team.name,
+          logo: raw.response.team.logo ?? null,
+          country: raw.response.team.country ?? null,
+        };
 
-    await setCached(cacheKey, response, CACHE_TTL.teamDetails);
+        const stats = normalizeTeamStats(
+          raw.response,
+          teamCore,
+          leagueId,
+          season
+        );
 
-    ok(res, response, {cached: false});
-  }, "getTeamDetails")
+        return {
+          team: teamCore,
+          leagueId,
+          season,
+          stats,
+          aggregates: aggregateTeamSeasonStats(stats),
+        };
+      }
+    );
+
+    ok(res, data, {cached});
+  })
 );
+// export const getTeamDetails = onRequest(
+//   {secrets: [API_FOOTBALL_KEY]},
+//   handler(async (req, res) => {
+//     const teamId = getNumberParam(req.query.team, "team");
+//     const leagueId = getNumberParam(req.query.league, "league");
+//     const season = getNumberParam(req.query.season, "season");
+
+//     const cacheKey = buildCacheKey("teamDetails", teamId, leagueId, season);
+//     const cached = await getCached(cacheKey);
+//     if (cached) {
+//       ok(res, cached, {cached: true});
+//       return;
+//     }
+
+//     // Fetch raw statistics
+//     const raw: any = await fetchFromApiFootball(
+//       "teams/statistics",
+//       {team: teamId, league: leagueId, season},
+//       API_FOOTBALL_KEY.value()
+//     );
+
+//     if (!raw.response) {
+//       throw new Error("Empty team statistics response");
+//     }
+
+//     const teamDataRaw = raw.response.team;
+//     if (!teamDataRaw?.id || !teamDataRaw?.name) {
+//       throw new Error("Invalid team data in statistics response");
+//     }
+
+//     // Build TeamCore object
+//     const teamCore: TeamCore = {
+//       id: teamDataRaw.id,
+//       name: teamDataRaw.name,
+//       logo: teamDataRaw.logo ?? null,
+//       country: teamDataRaw.country ?? null,
+//     };
+
+//     const stats = normalizeTeamStats(
+//       raw.response,
+//       teamCore,
+//       leagueId,
+//       season
+//     );
+
+//     const aggregates = aggregateTeamSeasonStats(stats);
+
+//     const response = {
+//       team: teamCore,
+//       leagueId,
+//       season,
+//       stats,
+//       aggregates,
+//     };
+
+//     await setCached(cacheKey, response, CACHE_TTL.teamDetails);
+
+//     ok(res, response, {cached: false});
+//   }, "getTeamDetails")
+// );
 
 
 /**
@@ -264,69 +316,143 @@ export const getTeamDetailsCallable = onCall(
       season
     );
 
-    const cached = await getCached(cacheKey);
-
-    if (cached) {
-      // return {...cached, cached: true};
-      return buildResponse(cached, {cached: true});
-    }
-
-    const raw: any = await fetchFromApiFootball(
-      "teams/statistics",
-      {team: teamId, league: leagueId, season},
-      API_FOOTBALL_KEY.value()
-    );
-
-    if (!raw.response) {
-      throw new HttpsError(
-        "not-found",
-        "Team statistics not found"
-      );
-    }
-
-    const teamDataRaw = raw.response.team;
-
-    if (!teamDataRaw?.id || !teamDataRaw?.name) {
-      throw new HttpsError(
-        "internal",
-        "Invalid team data in statistics response"
-      );
-    }
-
-    const teamCore: TeamCore = {
-      id: teamDataRaw.id,
-      name: teamDataRaw.name,
-      logo: teamDataRaw.logo ?? null,
-      country: teamDataRaw.country ?? null,
-    };
-
-    const stats = normalizeTeamStats(
-      raw.response,
-      teamCore,
-      leagueId,
-      season
-    );
-
-    const aggregates = aggregateTeamSeasonStats(stats);
-
-    const response = {
-      team: teamCore,
-      leagueId,
-      season,
-      stats,
-      aggregates,
-    };
-
-    await setCached(
+    const {data, cached} = await safeFetch(
       cacheKey,
-      response,
-      CACHE_TTL.teamDetails
+      CACHE_TTL.teamDetails,
+      async () => {
+        const raw: any = await fetchFromApiFootball(
+          "teams/statistics",
+          {team: teamId, league: leagueId, season},
+          API_FOOTBALL_KEY.value()
+        );
+
+        if (!raw.response) {
+          throw new HttpsError(
+            "not-found",
+            "Team statistics not found"
+          );
+        }
+
+        const teamDataRaw = raw.response.team;
+
+        if (!teamDataRaw?.id || !teamDataRaw?.name) {
+          throw new HttpsError(
+            "internal",
+            "Invalid team data"
+          );
+        }
+
+        const teamCore: TeamCore = {
+          id: teamDataRaw.id,
+          name: teamDataRaw.name,
+          logo: teamDataRaw.logo ?? null,
+          country: teamDataRaw.country ?? null,
+        };
+
+        const stats = normalizeTeamStats(
+          raw.response,
+          teamCore,
+          leagueId,
+          season
+        );
+
+        return {
+          team: teamCore,
+          leagueId,
+          season,
+          stats,
+          aggregates: aggregateTeamSeasonStats(stats),
+        };
+      }
     );
 
-    // return {...response, cached: false};
-    return buildResponse(response, {cached: false});
+    return buildResponse(data, {cached});
   }
 );
+// export const getTeamDetailsCallable = onCall(
+//   {secrets: [API_FOOTBALL_KEY]},
+//   async (request) => {
+//     const teamId = Number(request.data.team);
+//     const leagueId = Number(request.data.league);
+//     const season = Number(request.data.season);
+
+//     if (!teamId || !leagueId || !season) {
+//       throw new HttpsError(
+//         "invalid-argument",
+//         "team, league and season are required"
+//       );
+//     }
+
+//     const cacheKey = buildCacheKey(
+//       "teamDetails",
+//       teamId,
+//       leagueId,
+//       season
+//     );
+
+//     const cached = await getCached(cacheKey);
+
+//     if (cached) {
+//       // return {...cached, cached: true};
+//       return buildResponse(cached, {cached: true});
+//     }
+
+//     const raw: any = await fetchFromApiFootball(
+//       "teams/statistics",
+//       {team: teamId, league: leagueId, season},
+//       API_FOOTBALL_KEY.value()
+//     );
+
+//     if (!raw.response) {
+//       throw new HttpsError(
+//         "not-found",
+//         "Team statistics not found"
+//       );
+//     }
+
+//     const teamDataRaw = raw.response.team;
+
+//     if (!teamDataRaw?.id || !teamDataRaw?.name) {
+//       throw new HttpsError(
+//         "internal",
+//         "Invalid team data in statistics response"
+//       );
+//     }
+
+//     const teamCore: TeamCore = {
+//       id: teamDataRaw.id,
+//       name: teamDataRaw.name,
+//       logo: teamDataRaw.logo ?? null,
+//       country: teamDataRaw.country ?? null,
+//     };
+
+//     const stats = normalizeTeamStats(
+//       raw.response,
+//       teamCore,
+//       leagueId,
+//       season
+//     );
+
+//     const aggregates = aggregateTeamSeasonStats(stats);
+
+//     const response = {
+//       team: teamCore,
+//       leagueId,
+//       season,
+//       stats,
+//       aggregates,
+//     };
+
+//     await setCached(
+//       cacheKey,
+//       response,
+//       CACHE_TTL.teamDetails
+//     );
+
+//     // return {...response, cached: false};
+//     return buildResponse(response, {cached: false});
+//   }
+// );
 
 export const getTeamPlayersCallable = onCall(
   {secrets: [API_FOOTBALL_KEY]},

@@ -10,8 +10,7 @@ import {buildResponse} from "../utils/response";
  * GET /getSupportedLeagues
  */
 export const getSupportedLeagues = onRequest((_req, res): void => {
-  // res.json(Object.values(SUPPORTED_LEAGUES));
-  buildResponse(Object.values(SUPPORTED_LEAGUES));
+  res.json(Object.values(SUPPORTED_LEAGUES));
 });
 
 /**

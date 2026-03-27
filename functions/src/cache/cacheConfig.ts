@@ -27,7 +27,7 @@ export const CACHE_TTL = {
   teamDetails: 12 * 60 * 60,
   teamPlayers: 6 * 60 * 60,
   player: 12 * 60 * 60,
-  matches: 2 * 60,
+  matches: 30 * 60,
   matchDetails: 1 * 60,
   matchStats: 1 * 60,
 } as const;

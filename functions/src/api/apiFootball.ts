@@ -12,16 +12,18 @@ const BASE_URL = "https://v3.football.api-sports.io";
  * @return {Promise<any[]>} API-Football response array.
  * @throws {Error} When the API request fails.
  */
-export async function fetchFromApiFootball(
+export async function fetchFromApiFootball<T>(
   endpoint: string,
   query: Record<string, string | number>,
   apiKey: string
-): Promise<any[]> {
+): Promise<T> {
   const url = new URL(`${BASE_URL}/${endpoint}`);
 
   Object.entries(query).forEach(([key, value]) => {
     url.searchParams.append(key, String(value));
   });
+
+  console.log("[API CALL]", endpoint, query);
 
   const response = await fetch(url.toString(), {
     headers: {
@@ -31,8 +33,9 @@ export async function fetchFromApiFootball(
 
   if (!response.ok) {
     const text = await response.text();
+    console.error("[API ERROR]", response.status, text);
     throw new Error(`API-Football error ${response.status}: ${text}`);
   }
 
-  return response.json();
+  return response.json() as Promise<T>;
 }
