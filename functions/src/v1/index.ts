@@ -20,7 +20,14 @@ export {
   getPlayer,
   getPlayerCallable,
 } from "../functions/players";
+
 export {
   getSupportedLeagues,
   getSupportedLeaguesCallable,
+  getTeamsByLeague,
 } from "../functions/leagues";
+
+export {
+  saveFavorites,
+  getFavorites,
+} from "../functions/preferences";
