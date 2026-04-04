@@ -1,14 +1,14 @@
 import {onRequest, onCall, HttpsError} from "firebase-functions/v2/https";
 import {SUPPORTED_LEAGUES} from "../constants/leagues";
-import {buildResponse} from "../utils/response";
+import {buildResponse, ok} from "../utils/response";
 import {defineSecret} from "firebase-functions/params";
 import {buildCacheKey} from "../cache/cacheKeys";
 import {safeFetch} from "../utils/safeFetch";
 import {CACHE_TTL} from "../cache/cacheConfig";
 import {fetchFromApiFootball} from "../api/apiFootball";
+import {handler} from "../utils/handler";
 
 const API_FOOTBALL_KEY = defineSecret("API_FOOTBALL_KEY");
-// import {ApiError} from "../utils/apiError";
 
 /**
  * Returns all supported leagues with metadata.
@@ -37,7 +37,52 @@ export const getSupportedLeaguesCallable = onCall((request) => {
   return buildResponse(Object.values(SUPPORTED_LEAGUES));
 });
 
-export const getTeamsByLeague = onCall(
+export const getTeamsByLeague = onRequest(
+  {secrets: [API_FOOTBALL_KEY]},
+  handler(async (req, res) => {
+    try {
+      const league = Number(req.query.league);
+      const season = Number(req.query.season);
+
+      if (!league || !season) {
+        res.status(400).json({
+          error: "Missing params: league and season are required",
+        });
+        return;
+      }
+
+      const cacheKey = buildCacheKey("team", league, season);
+
+      const {data, cached} = await safeFetch(
+        cacheKey,
+        CACHE_TTL.team,
+        async () => {
+          const raw: any = await fetchFromApiFootball(
+            "teams",
+            {league, season},
+            API_FOOTBALL_KEY.value()
+          );
+
+          return raw.response.map((t: any) => ({
+            id: t.team.id,
+            name: t.team.name,
+            logo: t.team.logo,
+          }));
+        }
+      );
+
+      ok(res, data, {cached});
+    } catch (error: any) {
+      console.error("getTeamsByLeagueHttp error:", error);
+
+      res.status(500).json({
+        error: "Internal server error",
+      });
+    }
+  })
+);
+
+export const getTeamsByLeagueCallable = onCall(
   {secrets: [API_FOOTBALL_KEY]},
   async (request) => {
     const league = Number(request.data.league);
@@ -49,7 +94,7 @@ export const getTeamsByLeague = onCall(
 
     const cacheKey = buildCacheKey("team", league, season);
 
-    const {data} = await safeFetch(
+    const {data, cached} = await safeFetch(
       cacheKey,
       CACHE_TTL.team,
       async () => {
@@ -67,6 +112,6 @@ export const getTeamsByLeague = onCall(
       }
     );
 
-    return data;
+    return buildResponse(data, {cached});
   }
 );

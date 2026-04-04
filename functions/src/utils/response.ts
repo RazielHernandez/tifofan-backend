@@ -89,10 +89,10 @@ export function buildResponse<T>(
 
   return {
     data,
-    ...(pagination && {pagination}),
     meta: {
       timestamp: Math.floor(Date.now() / 1000),
       cached,
+      ...(pagination && {pagination}),
     },
   };
 }
@@ -108,10 +108,10 @@ export interface PaginationMeta {
 export interface ApiMeta {
   timestamp: number;
   cached: boolean;
+  pagination?: PaginationMeta;
 }
 
 export interface ApiResponse<T> {
   data: T;
-  pagination?: PaginationMeta;
   meta: ApiMeta;
 }

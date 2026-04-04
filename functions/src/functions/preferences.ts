@@ -1,5 +1,6 @@
 import {onCall, HttpsError} from "firebase-functions/v2/https";
 import {db} from "../admin";
+import {buildResponse} from "../utils/response";
 
 export const saveFavorites = onCall(async (request) => {
   const uid = request.auth?.uid;
@@ -25,7 +26,10 @@ export const saveFavorites = onCall(async (request) => {
       updatedAt: Date.now(),
     });
 
-  return {success: true};
+  return buildResponse(
+    {success: true},
+    {cached: false}
+  );
 });
 
 export const getFavorites = onCall(async (request) => {
@@ -42,12 +46,11 @@ export const getFavorites = onCall(async (request) => {
     .doc("favorites")
     .get();
 
-  if (!doc.exists) {
-    return {
+  const data = doc.exists ?
+    doc.data() : {
       leagues: [],
       teams: [],
     };
-  }
 
-  return doc.data();
+  return buildResponse(data, {cached: false});
 });

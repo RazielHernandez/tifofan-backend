@@ -73,56 +73,6 @@ export const getMatches = onRequest(
     });
   })
 );
-// export const getMatches = onRequest(
-//   {secrets: [API_FOOTBALL_KEY]},
-//   handler(async (req, res)=>{
-//     const league = getNumberParam(req.query.league, "league");
-//     const season = getNumberParam(req.query.season, "season");
-//     const page = getNumberParam(req.query.page, "page") ?? 1;
-
-//     const PER_PAGE = 20;
-
-//     const cacheKey = buildCacheKey("matches", league, season);
-
-//     // 1️⃣ Try cache (full dataset)
-//     const cached = await getCached<any[]>(cacheKey);
-//     let matches: any[];
-
-//     if (cached) {
-//       matches = cached;
-//     } else {
-//       // 2️⃣ Fetch once
-//       const raw: any = await fetchFromApiFootball(
-//         "fixtures",
-//         {league, season},
-//         API_FOOTBALL_KEY.value()
-//       );
-
-//       matches = raw.response.map(normalizeMatch);
-
-//       // 3️⃣ Cache normalized data
-//       await setCached(cacheKey, matches, CACHE_TTL.matches);
-//     }
-
-//     // 4️⃣ Paginate in backend
-//     const start = (page - 1) * PER_PAGE;
-//     const paged = matches.slice(start, start + PER_PAGE);
-
-//     const pagination = {
-//       page,
-//       perPage: PER_PAGE,
-//       totalItems: matches.length,
-//       totalPages: Math.ceil(matches.length / PER_PAGE),
-//       hasNext: page * PER_PAGE < matches.length,
-//     };
-
-//     ok(res, paged, {
-//       cached: Boolean(cached),
-//       pagination,
-//     });
-//   }, "getMatches")
-// );
-
 
 /**
  * Returns match details by fixture ID.
@@ -188,44 +138,6 @@ export const getMatchStatistics = onRequest(
     ok(res, data, {cached});
   })
 );
-// export const getMatchStatistics = onRequest(
-//   {secrets: [API_FOOTBALL_KEY]},
-//   handler(async (req, res)=>{
-//     const fixture = getNumberParam(req.query.fixture, "fixture");
-
-//     const cacheKey = buildCacheKey(
-//       "matchStats",
-//       fixture
-//     );
-
-//     const cached = await getCached<any[]>(cacheKey);
-//     if (cached) {
-//       ok(res, cached, {cached: true});
-//       return;
-//     }
-
-//     const raw:any = await fetchFromApiFootball(
-//       "fixtures/statistics",
-//       {fixture},
-//       API_FOOTBALL_KEY.value()
-//     );
-
-//     if (!Array.isArray(raw.response) || raw.response.length === 0) {
-//       throw new Error("Empty match statistics response");
-//     }
-
-//     const normalized = raw.response.map(normalizeMatchStatistics);
-
-//     await setCached(
-//       cacheKey,
-//       normalized,
-//       CACHE_TTL.matchDetails
-//     );
-
-//     ok(res, normalized, {cached: false});
-//   }, "getMatchStatistics")
-// );
-
 
 /* -------------------------------------------------------------------------- */
 /*                                Callables                                   */
@@ -277,65 +189,6 @@ export const getMatchesCallable = onCall(
     });
   }
 );
-// export const getMatchesCallable = onCall(
-//   {secrets: [API_FOOTBALL_KEY]},
-//   async (request) => {
-//     const league = Number(request.data.league);
-//     const season = Number(request.data.season);
-//     const page = Number(request.data.page ?? 1);
-
-//     if (!league || !season) {
-//       throw new HttpsError(
-//         "invalid-argument",
-//         "league and season are required"
-//       );
-//     }
-
-//     const PER_PAGE = 20;
-//     const cacheKey = buildCacheKey("matches", league, season);
-
-//     const cached = await getCached<any[]>(cacheKey);
-//     let matches: any[];
-
-//     if (cached) {
-//       matches = cached;
-//     } else {
-//       const raw: any = await fetchFromApiFootball(
-//         "fixtures",
-//         {league, season},
-//         API_FOOTBALL_KEY.value()
-//       );
-
-//       matches = raw.response.map(normalizeMatch);
-//       await setCached(cacheKey, matches, CACHE_TTL.matches);
-//     }
-
-//     const start = (page - 1) * PER_PAGE;
-//     const paged = matches.slice(start, start + PER_PAGE);
-
-//     // return {
-//     //   items: paged,
-//     //   pagination: {
-//     //     page,
-//     //     perPage: PER_PAGE,
-//     //     totalItems: matches.length,
-//     //     totalPages: Math.ceil(matches.length / PER_PAGE),
-//     //     hasNext: page * PER_PAGE < matches.length,
-//     //   },
-//     //   cached: Boolean(cached),
-//     // };
-//     return buildResponse(paged, {
-//       cached: Boolean(cached),
-//       pagination: {
-//         page,
-//         perPage: PER_PAGE,
-//         totalItems: matches.length,
-//         totalPages: Math.ceil(matches.length / PER_PAGE),
-//         hasNext: page * PER_PAGE < matches.length,
-//       },
-//     });
-//   }
-// );
 
 export const getMatchDetailsCallable = onCall(
   {secrets: [API_FOOTBALL_KEY]},
@@ -417,49 +270,3 @@ export const getMatchStatisticsCallable = onCall(
     return buildResponse(data, {cached});
   }
 );
-// export const getMatchStatisticsCallable = onCall(
-//   {secrets: [API_FOOTBALL_KEY]},
-//   async (request) => {
-//     const fixture = Number(request.data.fixture);
-
-//     if (!fixture) {
-//       throw new HttpsError(
-//         "invalid-argument",
-//         "fixture is required"
-//       );
-//     }
-
-//     const cacheKey = buildCacheKey("matchStats", fixture);
-
-//     const cached = await getCached<any[]>(cacheKey);
-//     if (cached) {
-//       // return {items: cached, cached: true};
-//       return buildResponse(cached, {cached: true});
-//     }
-
-//     const raw: any = await fetchFromApiFootball(
-//       "fixtures/statistics",
-//       {fixture},
-//       API_FOOTBALL_KEY.value()
-//     );
-
-//     if (!Array.isArray(raw.response) || raw.response.length === 0) {
-//       throw new HttpsError(
-//         "not-found",
-//         "Match statistics not found"
-//       );
-//     }
-
-//     const normalized = raw.response.map(normalizeMatchStatistics);
-
-//     await setCached(
-//       cacheKey,
-//       normalized,
-//       CACHE_TTL.matchDetails
-//     );
-
-//     // return {items: normalized, cached: false};
-//     return buildResponse(normalized, {cached: false});
-//   }
-// );
-

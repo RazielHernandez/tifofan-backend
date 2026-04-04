@@ -25,6 +25,7 @@ export {
   getSupportedLeagues,
   getSupportedLeaguesCallable,
   getTeamsByLeague,
+  getTeamsByLeagueCallable,
 } from "../functions/leagues";
 
 export {
