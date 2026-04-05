@@ -3,6 +3,7 @@
  * Increment ONLY when response shape changes.
  */
 export const CACHE_VERSION = {
+  standings: 1,
   team: 1,
   teamDetails: 1,
   teamPlayers: 1,
@@ -23,6 +24,7 @@ export const CACHE_VERSION = {
  * matchStats: 1 * 60,           // 1 min – very dynamic
  */
 export const CACHE_TTL = {
+  standings: 6 * 60 * 60,
   team: 24 * 60 * 60,
   teamDetails: 12 * 60 * 60,
   teamPlayers: 6 * 60 * 60,

@@ -115,3 +115,76 @@ export const getTeamsByLeagueCallable = onCall(
     return buildResponse(data, {cached});
   }
 );
+
+export const getLeagueStandingsCallable = onCall(
+  {secrets: [API_FOOTBALL_KEY]},
+  async (request) => {
+    const league = Number(request.data.league);
+    const season = Number(request.data.season);
+
+    if (!league || !season) {
+      throw new HttpsError("invalid-argument", "Missing params");
+    }
+
+    const cacheKey = buildCacheKey("standings", league, season);
+
+    const {data, cached} = await safeFetch(
+      cacheKey,
+      CACHE_TTL.standings ?? 3600, // fallback 1 hour
+      async () => {
+        const raw: any = await fetchFromApiFootball(
+          "standings",
+          {league, season},
+          API_FOOTBALL_KEY.value()
+        );
+
+        /**
+         * API-Football structure:
+         * raw.response[0].league.standings[0]
+         */
+        const table = raw.response?.[0]?.league?.standings?.[0] ?? [];
+
+        return table.map((team: any) => ({
+          rank: team.rank,
+
+          team: {
+            id: team.team.id,
+            name: team.team.name,
+            logo: team.team.logo,
+          },
+
+          points: team.points,
+          goalsDiff: team.goalsDiff,
+          group: team.group,
+
+          form: team.form,
+
+          all: {
+            played: team.all.played,
+            win: team.all.win,
+            draw: team.all.draw,
+            lose: team.all.lose,
+            goalsFor: team.all.goals.for,
+            goalsAgainst: team.all.goals.against,
+          },
+
+          home: {
+            played: team.home.played,
+            win: team.home.win,
+            draw: team.home.draw,
+            lose: team.home.lose,
+          },
+
+          away: {
+            played: team.away.played,
+            win: team.away.win,
+            draw: team.away.draw,
+            lose: team.away.lose,
+          },
+        }));
+      }
+    );
+
+    return buildResponse(data, {cached});
+  }
+);
