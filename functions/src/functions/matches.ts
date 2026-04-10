@@ -139,6 +139,89 @@ export const getMatchStatistics = onRequest(
   })
 );
 
+export const getMatchLineups = onRequest(
+  {secrets: [API_FOOTBALL_KEY]},
+  handler(async (req, res) => {
+    try {
+      const fixture = Number(req.query.fixture);
+
+      if (!fixture) {
+        res.status(400).json({
+          error: "Missing param: fixture is required",
+        });
+        return;
+      }
+
+      const cacheKey = buildCacheKey("lineups", fixture);
+
+      const {data, cached} = await safeFetch(
+        cacheKey,
+        CACHE_TTL.lineups ?? 3600,
+        async () => {
+          const raw: any = await fetchFromApiFootball(
+            "fixtures/lineups",
+            {fixture},
+            API_FOOTBALL_KEY.value()
+          );
+
+          return (raw.response ?? []).map((teamBlock: any) => ({
+            team: {
+              id: teamBlock.team.id,
+              name: teamBlock.team.name,
+              logo: teamBlock.team.logo,
+
+              colors: {
+                player: {
+                  primary: teamBlock.team.colors?.player?.primary,
+                  number: teamBlock.team.colors?.player?.number,
+                  border: teamBlock.team.colors?.player?.border,
+                },
+                goalkeeper: {
+                  primary: teamBlock.team.colors?.goalkeeper?.primary,
+                  number: teamBlock.team.colors?.goalkeeper?.number,
+                  border: teamBlock.team.colors?.goalkeeper?.border,
+                },
+              },
+            },
+
+            coach: {
+              id: teamBlock.coach?.id,
+              name: teamBlock.coach?.name,
+              photo: teamBlock.coach?.photo,
+            },
+
+            formation: teamBlock.formation,
+
+            startXI: (teamBlock.startXI ?? []).map((p: any) => ({
+              id: p.player.id,
+              name: p.player.name,
+              number: p.player.number,
+              position: p.player.pos,
+              grid: p.player.grid,
+            })),
+
+            substitutes: (teamBlock.substitutes ?? []).map((p: any) => ({
+              id: p.player.id,
+              name: p.player.name,
+              number: p.player.number,
+              position: p.player.pos,
+              grid: p.player.grid,
+            })),
+          }));
+        }
+      );
+
+      ok(res, data, {cached});
+    } catch (error) {
+      console.error("getMatchLineups error:", error);
+
+      res.status(500).json({
+        error: "Internal server error",
+      });
+    }
+  })
+);
+
 /* -------------------------------------------------------------------------- */
 /*                                Callables                                   */
 /* -------------------------------------------------------------------------- */
@@ -264,6 +347,83 @@ export const getMatchStatisticsCallable = onCall(
         }
 
         return raw.response.map(normalizeMatchStatistics);
+      }
+    );
+
+    return buildResponse(data, {cached});
+  }
+);
+
+export const getMatchLineupsCallable = onCall(
+  {secrets: [API_FOOTBALL_KEY]},
+  async (request) => {
+    const fixture = Number(request.data.fixture);
+
+    if (!fixture) {
+      throw new HttpsError("invalid-argument", "Missing params");
+    }
+
+    const cacheKey = buildCacheKey("lineups", fixture);
+
+    const {data, cached} = await safeFetch(
+      cacheKey,
+      CACHE_TTL.lineups ?? 3600,
+      async () => {
+        const raw: any = await fetchFromApiFootball(
+          "fixtures/lineups",
+          {fixture},
+          API_FOOTBALL_KEY.value()
+        );
+
+        return (raw.response ?? []).map((teamBlock: any) => ({
+          // ✅ TEAM
+          team: {
+            id: teamBlock.team.id,
+            name: teamBlock.team.name,
+            logo: teamBlock.team.logo,
+
+            colors: {
+              player: {
+                primary: teamBlock.team.colors?.player?.primary,
+                number: teamBlock.team.colors?.player?.number,
+                border: teamBlock.team.colors?.player?.border,
+              },
+              goalkeeper: {
+                primary: teamBlock.team.colors?.goalkeeper?.primary,
+                number: teamBlock.team.colors?.goalkeeper?.number,
+                border: teamBlock.team.colors?.goalkeeper?.border,
+              },
+            },
+          },
+
+          // ✅ COACH
+          coach: {
+            id: teamBlock.coach?.id,
+            name: teamBlock.coach?.name,
+            photo: teamBlock.coach?.photo,
+          },
+
+          // ✅ FORMATION
+          formation: teamBlock.formation,
+
+          // ✅ STARTING XI
+          startXI: (teamBlock.startXI ?? []).map((p: any) => ({
+            id: p.player.id,
+            name: p.player.name,
+            number: p.player.number,
+            position: p.player.pos,
+            grid: p.player.grid, // 🔥 key for UI positioning
+          })),
+
+          // ✅ SUBSTITUTES
+          substitutes: (teamBlock.substitutes ?? []).map((p: any) => ({
+            id: p.player.id,
+            name: p.player.name,
+            number: p.player.number,
+            position: p.player.pos,
+            grid: p.player.grid, // usually null
+          })),
+        }));
       }
     );
 

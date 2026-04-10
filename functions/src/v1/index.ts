@@ -2,9 +2,11 @@ export {
   getMatches,
   getMatchDetails,
   getMatchStatistics,
+  getMatchLineups,
   getMatchesCallable,
   getMatchDetailsCallable,
   getMatchStatisticsCallable,
+  getMatchLineupsCallable,
 } from "../functions/matches";
 
 export {
@@ -32,4 +34,6 @@ export {
 export {
   saveFavorites,
   getFavorites,
+  addFavorite,
+  removeFavorite,
 } from "../functions/preferences";
