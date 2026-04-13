@@ -7,6 +7,9 @@ export {
   getMatchDetailsCallable,
   getMatchStatisticsCallable,
   getMatchLineupsCallable,
+  getMatchesByDateCallable,
+  getMatchesByRoundCallable,
+  getMatchesByTeamCallable,
 } from "../functions/matches";
 
 export {
@@ -29,6 +32,7 @@ export {
   getTeamsByLeague,
   getTeamsByLeagueCallable,
   getLeagueStandingsCallable,
+  getLeagueStatsCallable,
 } from "../functions/leagues";
 
 export {

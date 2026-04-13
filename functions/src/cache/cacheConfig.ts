@@ -12,6 +12,7 @@ export const CACHE_VERSION = {
   matches: 1,
   matchDetails: 1,
   matchStats: 1,
+  leagueStats: 1,
 } as const;
 
 /**
@@ -34,4 +35,5 @@ export const CACHE_TTL = {
   matches: 30 * 60,
   matchDetails: 1 * 60,
   matchStats: 1 * 60,
+  leagueStats: 6 * 60 * 60,
 } as const;

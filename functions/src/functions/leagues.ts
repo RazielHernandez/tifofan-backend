@@ -188,3 +188,108 @@ export const getLeagueStandingsCallable = onCall(
     return buildResponse(data, {cached});
   }
 );
+
+export const getLeagueStatsCallable = onCall(
+  {secrets: [API_FOOTBALL_KEY]},
+  async (request) => {
+    const league = Number(request.data.league);
+    const season = Number(request.data.season);
+
+    if (!league || !season) {
+      throw new HttpsError("invalid-argument", "Missing params");
+    }
+
+    const cacheKey = buildCacheKey("leagueStats", league, season);
+
+    const {data, cached} = await safeFetch(
+      cacheKey,
+      CACHE_TTL.standings,
+      async () => {
+        const [
+          scorers,
+          assists,
+          cards,
+          standingsRaw,
+        ] = await Promise.all([
+          fetchFromApiFootball<any>(
+            "players/topscorers", {league, season}, API_FOOTBALL_KEY.value()),
+          fetchFromApiFootball<any>(
+            "players/topassists", {league, season}, API_FOOTBALL_KEY.value()),
+          fetchFromApiFootball<any>(
+            "players/topcards", {league, season}, API_FOOTBALL_KEY.value()),
+          fetchFromApiFootball<any>(
+            "standings", {league, season}, API_FOOTBALL_KEY.value()),
+        ]);
+
+        const table = standingsRaw.response?.[0]?.league?.standings?.[0] ?? [];
+
+        const bestAttack = table.reduce((a: any, b: any) =>
+          a.all.goals.for > b.all.goals.for ? a : b
+        );
+
+        const bestDefense = table.reduce((a: any, b: any) =>
+          a.all.goals.against < b.all.goals.against ? a : b
+        );
+
+        // 🔥 Normalize players
+        const normalizePlayer = (p: any) => {
+          const s = p.statistics?.[0];
+
+          return {
+            player: {
+              id: p.player.id,
+              name: p.player.name,
+              photo: p.player.photo,
+            },
+            team: {
+              id: s.team.id,
+              name: s.team.name,
+              logo: s.team.logo,
+            },
+            statistics: {
+              goals: s.goals?.total ?? 0,
+              assists: s.goals?.assists ?? 0,
+              appearances: s.games?.appearences ?? 0,
+              yellow: s.cards?.yellow ?? 0,
+              red: s.cards?.red ?? 0,
+            },
+          };
+        };
+
+        return {
+          topScorers: scorers.response.slice(0, 10).map(normalizePlayer),
+          topAssists: assists.response.slice(0, 10).map(normalizePlayer),
+          topCards: cards.response.slice(0, 10).map(normalizePlayer),
+
+          teams: {
+            bestAttack: {
+              id: bestAttack.team.id,
+              name: bestAttack.team.name,
+              logo: bestAttack.team.logo,
+              goals: bestAttack.all.goals.for,
+            },
+            bestDefense: {
+              id: bestDefense.team.id,
+              name: bestDefense.team.name,
+              logo: bestDefense.team.logo,
+              goalsAgainst: bestDefense.all.goals.against,
+            },
+
+            // 🔥 BONUS: top 5 teams by goals
+            topScoringTeams: table
+              .sort((a: any, b: any) => b.all.goals.for - a.all.goals.for)
+              .slice(0, 5)
+              .map((t: any) => ({
+                id: t.team.id,
+                name: t.team.name,
+                logo: t.team.logo,
+                goals: t.all.goals.for,
+              })),
+          },
+        };
+      }
+    );
+
+    return buildResponse(data, {cached});
+  }
+);

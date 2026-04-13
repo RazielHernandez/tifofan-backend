@@ -430,3 +430,93 @@ export const getMatchLineupsCallable = onCall(
     return buildResponse(data, {cached});
   }
 );
+
+export const getMatchesByTeamCallable = onCall(
+  {secrets: [API_FOOTBALL_KEY]},
+  async (request) => {
+    const team = Number(request.data.team);
+    const season = Number(request.data.season);
+
+    if (!team || !season) {
+      throw new HttpsError("invalid-argument", "Missing params");
+    }
+
+    const cacheKey = buildCacheKey("matches", team, season);
+
+    const {data, cached} = await safeFetch(
+      cacheKey,
+      CACHE_TTL.matches,
+      async () => {
+        const raw: any = await fetchFromApiFootball(
+          "fixtures",
+          {team, season},
+          API_FOOTBALL_KEY.value()
+        );
+
+        return raw.response.map(normalizeMatch);
+      }
+    );
+
+    return buildResponse(data, {cached});
+  }
+);
+
+export const getMatchesByDateCallable = onCall(
+  {secrets: [API_FOOTBALL_KEY]},
+  async (request) => {
+    const date = request.data.date; // "YYYY-MM-DD"
+
+    if (!date) {
+      throw new HttpsError("invalid-argument", "Missing date");
+    }
+
+    const cacheKey = buildCacheKey("matches", date);
+
+    const {data, cached} = await safeFetch(
+      cacheKey,
+      CACHE_TTL.matches,
+      async () => {
+        const raw: any = await fetchFromApiFootball(
+          "fixtures",
+          {date},
+          API_FOOTBALL_KEY.value()
+        );
+
+        return raw.response.map(normalizeMatch);
+      }
+    );
+
+    return buildResponse(data, {cached});
+  }
+);
+
+export const getMatchesByRoundCallable = onCall(
+  {secrets: [API_FOOTBALL_KEY]},
+  async (request) => {
+    const league = Number(request.data.league);
+    const season = Number(request.data.season);
+    const round = request.data.round;
+
+    if (!league || !season || !round) {
+      throw new HttpsError("invalid-argument", "Missing params");
+    }
+
+    const cacheKey = buildCacheKey("matches", league, season, round);
+
+    const {data, cached} = await safeFetch(
+      cacheKey,
+      CACHE_TTL.matches,
+      async () => {
+        const raw: any = await fetchFromApiFootball(
+          "fixtures",
+          {league, season, round},
+          API_FOOTBALL_KEY.value()
+        );
+
+        return raw.response.map(normalizeMatch);
+      }
+    );
+
+    return buildResponse(data, {cached});
+  }
+);
