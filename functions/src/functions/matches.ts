@@ -520,3 +520,106 @@ export const getMatchesByRoundCallable = onCall(
     return buildResponse(data, {cached});
   }
 );
+
+export const getMatchEventsCallable = onCall(
+  {secrets: [API_FOOTBALL_KEY]},
+  async (request) => {
+    const fixture = Number(request.data.fixture);
+
+    if (!fixture) {
+      throw new HttpsError("invalid-argument", "Missing fixture id");
+    }
+
+    const cacheKey = buildCacheKey("matchEvents", fixture);
+
+    const {data, cached} = await safeFetch(
+      cacheKey,
+      CACHE_TTL.matchEvents ?? 30,
+      async () => {
+        const [eventsRaw, matchRaw] = await Promise.all([
+          fetchFromApiFootball<any>(
+            "fixtures/events",
+            {fixture},
+            API_FOOTBALL_KEY.value()
+          ),
+          fetchFromApiFootball<any>(
+            "fixtures",
+            {id: fixture},
+            API_FOOTBALL_KEY.value()
+          ),
+        ]);
+
+        const match = matchRaw.response?.[0];
+
+        if (!match) {
+          throw new Error("Match not found");
+        }
+
+        // 🔥 Normalize match info
+        const matchInfo = {
+          id: match.fixture.id,
+          date: match.fixture.date,
+          status: match.fixture.status.short,
+
+          venue: match.fixture.venue?.name ?? null,
+
+          league: {
+            id: match.league.id,
+            name: match.league.name,
+            logo: match.league.logo,
+          },
+
+          home: {
+            id: match.teams.home.id,
+            name: match.teams.home.name,
+            logo: match.teams.home.logo,
+            goals: match.goals.home,
+          },
+
+          away: {
+            id: match.teams.away.id,
+            name: match.teams.away.name,
+            logo: match.teams.away.logo,
+            goals: match.goals.away,
+          },
+        };
+
+        // 🔥 Normalize events
+        const events = eventsRaw.response.map((e: any) => ({
+          time: {
+            elapsed: e.time.elapsed,
+            extra: e.time.extra,
+          },
+
+          team: {
+            id: e.team.id,
+            name: e.team.name,
+            logo: e.team.logo,
+          },
+
+          player: {
+            id: e.player?.id,
+            name: e.player?.name,
+          },
+
+          assist: e.assist ? {
+            id: e.assist.id,
+            name: e.assist.name,
+          } : null,
+
+          type: e.type,
+          detail: e.detail,
+
+          comments: e.comments ?? null,
+        }));
+
+        return {
+          match: matchInfo,
+          events,
+        };
+      }
+    );
+
+    return buildResponse(data, {cached});
+  }
+);

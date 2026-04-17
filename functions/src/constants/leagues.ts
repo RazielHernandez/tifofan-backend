@@ -5,6 +5,14 @@ import {League} from "../types/league";
  * Keyed by league ID for fast lookup.
  */
 export const SUPPORTED_LEAGUES: Record<number, League> = {
+  1: {
+    id: 1,
+    name: "Woorld Cup 2026",
+    country: "North America",
+    countryCode: "NA",
+    fromSeason: 2026,
+    logo: "https://media.api-sports.io/football/leagues/1.png",
+  },
   39: {
     id: 39,
     name: "Premier League",

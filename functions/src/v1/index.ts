@@ -10,6 +10,7 @@ export {
   getMatchesByDateCallable,
   getMatchesByRoundCallable,
   getMatchesByTeamCallable,
+  getMatchEventsCallable,
 } from "../functions/matches";
 
 export {
