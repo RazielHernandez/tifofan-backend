@@ -13,6 +13,7 @@ import {getNumberParam} from "../utils/queryHelpers";
 import {buildResponse, ok} from "../utils/response";
 import {aggregateTeamSeasonStats} from "../aggregators/teamSeassonAgregates";
 import {safeFetch} from "../utils/safeFetch";
+import {normalizeTeamTransfers} from "../normalizers/teamTransfersNormalizer";
 
 const API_FOOTBALL_KEY = defineSecret("API_FOOTBALL_KEY");
 
@@ -453,6 +454,61 @@ export const getTeamDetailsCallable = onCall(
 //     return buildResponse(response, {cached: false});
 //   }
 // );
+
+export const getTeamTransfersCallable = onCall(
+  {secrets: [API_FOOTBALL_KEY]},
+  async (request) => {
+    try {
+      const team = Number(request.data.team);
+
+      if (!team) {
+        return buildResponse([], {cached: false});
+      }
+
+      const cacheKey = buildCacheKey("teamTransfers", team);
+
+      const {data, cached} = await safeFetch(
+        cacheKey,
+        CACHE_TTL.teamTransfers ?? 3600,
+        async () => {
+          let raw: any;
+
+          try {
+            raw = await fetchFromApiFootball(
+              "transfers",
+              {team},
+              API_FOOTBALL_KEY.value()
+            );
+          } catch (error) {
+            console.error("🔥 API ERROR:", error);
+            return [];
+          }
+
+          if (!raw?.response || !Array.isArray(raw.response)) {
+            console.warn("⚠️ Invalid transfers response:", raw);
+            return [];
+          }
+
+          if (raw.response.length === 0) {
+            return [];
+          }
+
+          try {
+            return raw.response.flatMap(normalizeTeamTransfers);
+          } catch (normalizeError) {
+            console.error("🔥 NORMALIZE ERROR:", normalizeError);
+            return [];
+          }
+        }
+      );
+
+      return buildResponse(data, {cached});
+    } catch (error) {
+      console.error("🔥 FINAL FUNCTION ERROR:", error);
+      return buildResponse([], {cached: false});
+    }
+  }
+);
 
 export const getTeamPlayersCallable = onCall(
   {secrets: [API_FOOTBALL_KEY]},

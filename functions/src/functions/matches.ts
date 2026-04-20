@@ -276,160 +276,424 @@ export const getMatchesCallable = onCall(
 export const getMatchDetailsCallable = onCall(
   {secrets: [API_FOOTBALL_KEY]},
   async (request) => {
-    const matchId = Number(request.data.fixture);
+    try {
+      const matchId = Number(request.data.fixture);
 
-    if (!matchId) {
-      throw new HttpsError(
-        "invalid-argument",
-        "fixture is required"
-      );
+      if (!matchId) {
+        throw new HttpsError("invalid-argument", "fixture is required");
+      }
+
+      const cacheKey = buildCacheKey("matchDetails", matchId);
+
+      // ✅ SAFE CACHE READ
+      try {
+        const cached = await getCached(cacheKey);
+        if (cached) {
+          return buildResponse(cached, {cached: true});
+        }
+      } catch (cacheError) {
+        console.warn("⚠️ Cache read failed:", cacheError);
+      }
+
+      // ✅ SAFE API CALL
+      let raw: any;
+      try {
+        raw = await fetchFromApiFootball(
+          "fixtures",
+          {id: matchId},
+          API_FOOTBALL_KEY.value()
+        );
+      } catch (apiError) {
+        console.error("🔥 API ERROR:", apiError);
+        return buildResponse(null, {cached: false});
+      }
+
+      // ✅ VALIDATE RESPONSE
+      if (!raw || !Array.isArray(raw.response) || raw.response.length === 0) {
+        console.warn("⚠️ Invalid match response:", raw);
+        return buildResponse(null, {cached: false});
+      }
+
+      // ✅ SAFE NORMALIZE
+      let match;
+      try {
+        match = normalizeMatchDetails(raw.response[0]);
+      } catch (normalizeError) {
+        console.error("🔥 NORMALIZE ERROR:", normalizeError);
+        return buildResponse(null, {cached: false});
+      }
+
+      // ✅ SAFE CACHE WRITE
+      try {
+        await setCached(cacheKey, match, CACHE_TTL.matchDetails);
+      } catch (cacheWriteError) {
+        console.warn("⚠️ Cache write failed:", cacheWriteError);
+      }
+
+      return buildResponse(match, {cached: false});
+    } catch (error) {
+      console.error("🔥 FINAL FUNCTION ERROR:", error);
+
+      // 👇 NEVER throw → avoid INTERNAL
+      return buildResponse(null, {cached: false});
     }
-
-    const cacheKey = buildCacheKey("matchDetails", matchId);
-    const cached = await getCached(cacheKey);
-
-    if (cached) {
-      // return {item: cached, cached: true};
-      return buildResponse(cached, {cached: true});
-    }
-
-    const raw: any = await fetchFromApiFootball(
-      "fixtures",
-      {id: matchId},
-      API_FOOTBALL_KEY.value()
-    );
-
-    if (!raw.response?.length) {
-      throw new HttpsError(
-        "not-found",
-        "Match not found"
-      );
-    }
-
-    const match = normalizeMatchDetails(raw.response[0]);
-
-    await setCached(cacheKey, match, CACHE_TTL.matchDetails);
-
-    // return {item: match, cached: false};
-    return buildResponse(match, {cached: false});
   }
 );
+// export const getMatchDetailsCallable = onCall(
+//   {secrets: [API_FOOTBALL_KEY]},
+//   async (request) => {
+//     const matchId = Number(request.data.fixture);
+
+//     if (!matchId) {
+//       throw new HttpsError(
+//         "invalid-argument",
+//         "fixture is required"
+//       );
+//     }
+
+//     const cacheKey = buildCacheKey("matchDetails", matchId);
+//     const cached = await getCached(cacheKey);
+
+//     if (cached) {
+//       // return {item: cached, cached: true};
+//       return buildResponse(cached, {cached: true});
+//     }
+
+//     const raw: any = await fetchFromApiFootball(
+//       "fixtures",
+//       {id: matchId},
+//       API_FOOTBALL_KEY.value()
+//     );
+
+//     if (!raw.response?.length) {
+//       throw new HttpsError(
+//         "not-found",
+//         "Match not found"
+//       );
+//     }
+
+//     const match = normalizeMatchDetails(raw.response[0]);
+
+//     await setCached(cacheKey, match, CACHE_TTL.matchDetails);
+
+//     // return {item: match, cached: false};
+//     return buildResponse(match, {cached: false});
+//   }
+// );
 
 export const getMatchStatisticsCallable = onCall(
   {secrets: [API_FOOTBALL_KEY]},
   async (request) => {
-    const fixture = Number(request.data.fixture);
+    try {
+      const fixture = Number(request.data.fixture);
 
-    if (!fixture) {
-      throw new HttpsError(
-        "invalid-argument",
-        "fixture is required"
-      );
-    }
-
-    const cacheKey = buildCacheKey("matchStats", fixture);
-
-    const {data, cached} = await safeFetch(
-      cacheKey,
-      CACHE_TTL.matchStats,
-      async () => {
-        const raw: any = await fetchFromApiFootball(
-          "fixtures/statistics",
-          {fixture},
-          API_FOOTBALL_KEY.value()
-        );
-
-        if (!Array.isArray(raw.response) || raw.response.length === 0) {
-          throw new HttpsError(
-            "not-found",
-            "Match statistics not found"
-          );
-        }
-
-        return raw.response.map(normalizeMatchStatistics);
+      if (!fixture) {
+        throw new HttpsError("invalid-argument", "fixture is required");
       }
-    );
 
-    return buildResponse(data, {cached});
+      const cacheKey = buildCacheKey("matchStats", fixture); // 🔥 version key
+
+      let result;
+
+      try {
+        result = await safeFetch(
+          cacheKey,
+          CACHE_TTL.matchStats ?? 30,
+          async () => {
+            let raw: any;
+
+            try {
+              raw = await fetchFromApiFootball(
+                "fixtures/statistics",
+                {fixture},
+                API_FOOTBALL_KEY.value()
+              );
+            } catch (apiError) {
+              console.error("🔥 API ERROR:", apiError);
+              return [];
+            }
+
+            if (!raw || !Array.isArray(raw.response)) {
+              console.warn("⚠️ Invalid API response:", raw);
+              return [];
+            }
+
+            if (raw.response.length === 0) {
+              return [];
+            }
+
+            try {
+              return raw.response.map((item: any) =>
+                normalizeMatchStatistics(item)
+              );
+            } catch (normalizeError) {
+              console.error("🔥 NORMALIZE ERROR:", normalizeError);
+              return [];
+            }
+          }
+        );
+      } catch (cacheError) {
+        console.error("🔥 CACHE ERROR:", cacheError);
+
+        // 🔥 fallback WITHOUT cache
+        try {
+          const raw: any = await fetchFromApiFootball(
+            "fixtures/statistics",
+            {fixture},
+            API_FOOTBALL_KEY.value()
+          );
+
+          if (!raw || !Array.isArray(raw.response)) {
+            return buildResponse([], {cached: false});
+          }
+
+          const data = raw.response.map((item: any) =>
+            normalizeMatchStatistics(item)
+          );
+
+          return buildResponse(data, {cached: false});
+        } catch (fallbackError) {
+          console.error("🔥 FALLBACK ERROR:", fallbackError);
+          return buildResponse([], {cached: false});
+        }
+      }
+
+      return buildResponse(result.data, {cached: result.cached});
+    } catch (error) {
+      console.error("🔥 FINAL FUNCTION ERROR:", error);
+      return buildResponse([], {cached: false});
+    }
   }
 );
+// export const getMatchStatisticsCallable = onCall(
+//   {secrets: [API_FOOTBALL_KEY]},
+//   async (request) => {
+//     try {
+//       const fixture = Number(request.data.fixture);
+
+//       if (!fixture) {
+//         throw new HttpsError("invalid-argument", "fixture is required");
+//       }
+
+//       // 🔥 Use new versioned key to avoid old bad cache
+//       const cacheKey = buildCacheKey("matchStats", fixture);
+
+//       const {data, cached} = await safeFetch(
+//         cacheKey,
+//         CACHE_TTL.matchStats ?? 30, // ⏱ short TTL
+//         async () => {
+//           const raw: any = await fetchFromApiFootball(
+//             "fixtures/statistics",
+//             {fixture},
+//             API_FOOTBALL_KEY.value()
+//           );
+
+//           if (!Array.isArray(raw.response) || raw.response.length === 0) {
+//             return []; // ✅ cache empty safely
+//           }
+
+//           return raw.response.map(normalizeMatchStatistics);
+//         }
+//       );
+
+//       return buildResponse(data, {cached});
+//     } catch (error) {
+//       console.error("🔥 getMatchStatisticsCallable ERROR:", error);
+
+//       return buildResponse([], {cached: false});
+//     }
+//   }
+// );
+// export const getMatchStatisticsCallable = onCall(
+//   {secrets: [API_FOOTBALL_KEY]},
+//   async (request) => {
+//     const fixture = Number(request.data.fixture);
+
+//     if (!fixture) {
+//       throw new HttpsError(
+//         "invalid-argument",
+//         "fixture is required"
+//       );
+//     }
+
+//     const cacheKey = buildCacheKey("matchStats", fixture);
+
+//     const {data, cached} = await safeFetch(
+//       cacheKey,
+//       CACHE_TTL.matchStats,
+//       async () => {
+//         const raw: any = await fetchFromApiFootball(
+//           "fixtures/statistics",
+//           {fixture},
+//           API_FOOTBALL_KEY.value()
+//         );
+
+//         if (!Array.isArray(raw.response) || raw.response.length === 0) {
+//           return [];
+//         }
+
+//         return raw.response.map(normalizeMatchStatistics);
+//       }
+//     );
+
+//     return buildResponse(data, {cached});
+//   }
+// );
 
 export const getMatchLineupsCallable = onCall(
   {secrets: [API_FOOTBALL_KEY]},
   async (request) => {
-    const fixture = Number(request.data.fixture);
+    try {
+      const fixture = Number(request.data.fixture);
 
-    if (!fixture) {
-      throw new HttpsError("invalid-argument", "Missing params");
-    }
+      if (!fixture) {
+        throw new HttpsError("invalid-argument", "Missing params");
+      }
 
-    const cacheKey = buildCacheKey("lineups", fixture);
+      // 🔥 versioned cache key
+      const cacheKey = buildCacheKey("lineups", fixture);
 
-    const {data, cached} = await safeFetch(
-      cacheKey,
-      CACHE_TTL.lineups ?? 3600,
-      async () => {
-        const raw: any = await fetchFromApiFootball(
-          "fixtures/lineups",
-          {fixture},
-          API_FOOTBALL_KEY.value()
-        );
+      const {data, cached} = await safeFetch(
+        cacheKey,
+        CACHE_TTL.lineups ?? 120,
+        async () => {
+          const raw: any = await fetchFromApiFootball(
+            "fixtures/lineups",
+            {fixture},
+            API_FOOTBALL_KEY.value()
+          );
 
-        return (raw.response ?? []).map((teamBlock: any) => ({
-          // ✅ TEAM
-          team: {
-            id: teamBlock.team.id,
-            name: teamBlock.team.name,
-            logo: teamBlock.team.logo,
+          if (!Array.isArray(raw.response) || raw.response.length === 0) {
+            return [];
+          }
 
-            colors: {
-              player: {
-                primary: teamBlock.team.colors?.player?.primary,
-                number: teamBlock.team.colors?.player?.number,
-                border: teamBlock.team.colors?.player?.border,
-              },
-              goalkeeper: {
-                primary: teamBlock.team.colors?.goalkeeper?.primary,
-                number: teamBlock.team.colors?.goalkeeper?.number,
-                border: teamBlock.team.colors?.goalkeeper?.border,
+          return raw.response.map((teamBlock: any) => ({
+            team: {
+              id: teamBlock.team?.id ?? 0,
+              name: teamBlock.team?.name ?? "Unknown",
+              logo: teamBlock.team?.logo ?? "",
+              colors: {
+                player: {
+                  primary: teamBlock.team?.colors?.player?.primary ?? null,
+                  number: teamBlock.team?.colors?.player?.number ?? null,
+                  border: teamBlock.team?.colors?.player?.border ?? null,
+                },
+                goalkeeper: {
+                  primary: teamBlock.team?.colors?.goalkeeper?.primary ?? null,
+                  number: teamBlock.team?.colors?.goalkeeper?.number ?? null,
+                  border: teamBlock.team?.colors?.goalkeeper?.border ?? null,
+                },
               },
             },
-          },
+            coach: {
+              id: teamBlock.coach?.id ?? null,
+              name: teamBlock.coach?.name ?? "N/A",
+              photo: teamBlock.coach?.photo ?? null,
+            },
+            formation: teamBlock.formation ?? "N/A",
+            startXI: (teamBlock.startXI ?? []).map((p: any) => ({
+              id: p.player?.id ?? 0,
+              name: p.player?.name ?? "Unknown",
+              number: p.player?.number ?? 0,
+              position: p.player?.pos ?? "N/A",
+              grid: p.player?.grid ?? null,
+            })),
+            substitutes: (teamBlock.substitutes ?? []).map((p: any) => ({
+              id: p.player?.id ?? 0,
+              name: p.player?.name ?? "Unknown",
+              number: p.player?.number ?? 0,
+              position: p.player?.pos ?? "N/A",
+              grid: p.player?.grid ?? null,
+            })),
+          }));
+        }
+      );
 
-          // ✅ COACH
-          coach: {
-            id: teamBlock.coach?.id,
-            name: teamBlock.coach?.name,
-            photo: teamBlock.coach?.photo,
-          },
+      return buildResponse(data, {cached});
+    } catch (error) {
+      console.error("🔥 getMatchLineupsCallable ERROR:", error);
 
-          // ✅ FORMATION
-          formation: teamBlock.formation,
-
-          // ✅ STARTING XI
-          startXI: (teamBlock.startXI ?? []).map((p: any) => ({
-            id: p.player.id,
-            name: p.player.name,
-            number: p.player.number,
-            position: p.player.pos,
-            grid: p.player.grid, // 🔥 key for UI positioning
-          })),
-
-          // ✅ SUBSTITUTES
-          substitutes: (teamBlock.substitutes ?? []).map((p: any) => ({
-            id: p.player.id,
-            name: p.player.name,
-            number: p.player.number,
-            position: p.player.pos,
-            grid: p.player.grid, // usually null
-          })),
-        }));
-      }
-    );
-
-    return buildResponse(data, {cached});
+      return buildResponse([], {cached: false});
+    }
   }
 );
+
+// export const getMatchLineupsCallable = onCall(
+//   {secrets: [API_FOOTBALL_KEY]},
+//   async (request) => {
+//     const fixture = Number(request.data.fixture);
+
+//     if (!fixture) {
+//       throw new HttpsError("invalid-argument", "Missing params");
+//     }
+
+//     const cacheKey = buildCacheKey("lineups", fixture);
+
+//     const {data, cached} = await safeFetch(
+//       cacheKey,
+//       CACHE_TTL.lineups ?? 3600,
+//       async () => {
+//         const raw: any = await fetchFromApiFootball(
+//           "fixtures/lineups",
+//           {fixture},
+//           API_FOOTBALL_KEY.value()
+//         );
+
+//         return (raw.response ?? []).map((teamBlock: any) => ({
+//           // ✅ TEAM
+//           team: {
+//             id: teamBlock.team.id,
+//             name: teamBlock.team.name,
+//             logo: teamBlock.team.logo,
+
+//             colors: {
+//               player: {
+//                 primary: teamBlock.team.colors?.player?.primary,
+//                 number: teamBlock.team.colors?.player?.number,
+//                 border: teamBlock.team.colors?.player?.border,
+//               },
+//               goalkeeper: {
+//                 primary: teamBlock.team.colors?.goalkeeper?.primary,
+//                 number: teamBlock.team.colors?.goalkeeper?.number,
+//                 border: teamBlock.team.colors?.goalkeeper?.border,
+//               },
+//             },
+//           },
+
+//           // ✅ COACH
+//           coach: {
+//             id: teamBlock.coach?.id,
+//             name: teamBlock.coach?.name,
+//             photo: teamBlock.coach?.photo,
+//           },
+
+//           // ✅ FORMATION
+//           formation: teamBlock.formation,
+
+//           // ✅ STARTING XI
+//           startXI: (teamBlock.startXI ?? []).map((p: any) => ({
+//             id: p.player.id,
+//             name: p.player.name,
+//             number: p.player.number,
+//             position: p.player.pos,
+//             grid: p.player.grid, // 🔥 key for UI positioning
+//           })),
+
+//           // ✅ SUBSTITUTES
+//           substitutes: (teamBlock.substitutes ?? []).map((p: any) => ({
+//             id: p.player.id,
+//             name: p.player.name,
+//             number: p.player.number,
+//             position: p.player.pos,
+//             grid: p.player.grid, // usually null
+//           })),
+//         }));
+//       }
+//     );
+
+//     return buildResponse(data, {cached});
+//   }
+// );
 
 export const getMatchesByTeamCallable = onCall(
   {secrets: [API_FOOTBALL_KEY]},
